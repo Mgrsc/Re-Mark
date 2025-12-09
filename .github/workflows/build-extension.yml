@@ -34,7 +34,7 @@ jobs:
         run: cd extension/.output/chrome-mv3 && zip -r ../../remark-chrome.zip .
 
       - name: Create Firefox ZIP
-        run: cd extension/.output/firefox-mv3 && zip -r ../../remark-firefox.zip .
+        run: cd extension/.output/firefox-mv2 && zip -r ../../remark-firefox.zip .
 
       - name: Get version
         id: version
