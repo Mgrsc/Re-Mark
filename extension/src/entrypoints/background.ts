@@ -1,3 +1,5 @@
+import { browser } from 'wxt/browser';
+import { defineBackground } from 'wxt/utils/define-background';
 import { getSettings } from '../utils/storage';
 import { getBookmarkTree, flattenBookmarks, buildBookmarkTree, clearAllBookmarks, countBookmarks } from '../utils/bookmarks';
 import { fetchGist, updateGist, createGist } from '../utils/gist';
@@ -82,7 +84,7 @@ const localeText = () => locales[getLocale()];
 let isSyncing = false;
 let syncTimeout: number | null = null;
 
-const notificationIcon = browser.runtime.getURL('icon/128.png');
+const notificationIcon = '/icon/128.png';
 
 const showNotification = async (title: string, message: string) => {
   if (!title?.trim() || !message?.trim()) return;

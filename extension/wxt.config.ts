@@ -1,7 +1,6 @@
 import { defineConfig } from 'wxt';
 
 export default defineConfig({
-  extensionApi: 'chrome',
   srcDir: 'src',
   modules: ['@wxt-dev/module-react'],
   manifest: {
@@ -15,7 +14,7 @@ export default defineConfig({
       "https://raw.githubusercontent.com/*",
       "http://localhost:*/*"
     ],
-    optional_host_permissions: ["https://*/*"],
+    optional_host_permissions: ["https://*/*", "http://*/*"],
     icons: {
       "16": "icon/16.png",
       "32": "icon/32.png",

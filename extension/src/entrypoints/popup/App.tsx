@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { browser } from 'wxt/browser';
 import { getSettings } from '../../utils/storage';
 import './style.css';
 

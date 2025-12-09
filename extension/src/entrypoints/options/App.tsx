@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { browser } from 'wxt/browser';
 import { getSettings, saveSettings } from '../../utils/storage';
 import type { Settings } from '../../types';
 import './style.css';
@@ -50,8 +51,9 @@ export default function App() {
 
   async function handleSave() {
     try {
-      await saveSettings(settings);
       if (settings.webUrl) await ensureWebPermission(settings.webUrl);
+
+      await saveSettings(settings);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
@@ -267,7 +269,7 @@ async function ensureWebPermission(webUrl: string) {
   if (!granted) throw new Error(localizedPermissionDeniedMessage());
 }
 
-function localizedInvalidUrlMessage(webUrl: string): string {
+function localizedInvalidUrlMessage(_webUrl: string): string {
   const lang = navigator.language?.toLowerCase().startsWith('zh') ? 'zh' : 'en';
   return lang === 'zh' ? '请输入有效的 Web URL（例如：https://example.com）。' : 'Please enter a valid Web URL (e.g., https://example.com).';
 }

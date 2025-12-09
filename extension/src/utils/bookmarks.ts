@@ -1,14 +1,17 @@
+import { browser } from 'wxt/browser';
 import type { BookmarkItem, SyncData } from '../types';
 
-export async function getBookmarkTree(): Promise<chrome.bookmarks.BookmarkTreeNode[]> {
+type BookmarkTreeNode = chrome.bookmarks.BookmarkTreeNode;
+
+export async function getBookmarkTree(): Promise<BookmarkTreeNode[]> {
   return browser.bookmarks.getTree();
 }
 
-export async function flattenBookmarks(tree: chrome.bookmarks.BookmarkTreeNode[]): Promise<BookmarkItem[]> {
+export async function flattenBookmarks(tree: BookmarkTreeNode[]): Promise<BookmarkItem[]> {
   const items: BookmarkItem[] = [];
   let order = 0;
 
-  async function traverse(nodes: chrome.bookmarks.BookmarkTreeNode[], parentId?: string) {
+  async function traverse(nodes: BookmarkTreeNode[], parentId?: string) {
     for (const node of nodes) {
       const id = await generateStableId(node);
       items.push({
@@ -112,7 +115,7 @@ function resolveRootId(title: string): string | null {
   return mapping[t] || null;
 }
 
-async function generateStableId(node: chrome.bookmarks.BookmarkTreeNode): Promise<string> {
+async function generateStableId(node: BookmarkTreeNode): Promise<string> {
   const content = `${node.title}::${node.url || 'folder'}::${node.dateAdded || 0}`;
   const encoder = new TextEncoder();
   const data = encoder.encode(content);

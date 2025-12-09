@@ -1,3 +1,4 @@
+import { browser } from 'wxt/browser';
 import type { Settings } from '../types';
 
 const DEFAULT_SETTINGS: Settings = {
