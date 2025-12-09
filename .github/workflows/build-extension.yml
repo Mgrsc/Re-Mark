@@ -1,0 +1,101 @@
+name: Build Extension
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: extension/package-lock.json
+
+      - name: Install dependencies
+        run: cd extension && npm ci
+
+      - name: Build Chrome extension
+        run: cd extension && npm run build
+
+      - name: Build Firefox extension
+        run: cd extension && npm run build:firefox
+
+      - name: Create Chrome ZIP
+        run: cd extension/.output/chrome-mv3 && zip -r ../../remark-chrome.zip .
+
+      - name: Create Firefox ZIP
+        run: cd extension/.output/firefox-mv3 && zip -r ../../remark-firefox.zip .
+
+      - name: Get version
+        id: version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "version=dev-$(date +%Y%m%d-%H%M%S)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          name: Re:Mark ${{ steps.version.outputs.version }}
+          body: |
+            ## Re:Mark Browser Extension
+
+            AI-enhanced bookmark knowledge base
+
+            ### Installation
+
+            **Chrome/Edge:**
+            1. Download `remark-chrome.zip`
+            2. Unzip the file
+            3. Open Chrome/Edge and go to `chrome://extensions/`
+            4. Enable "Developer mode"
+            5. Click "Load unpacked" and select the unzipped folder
+
+            **Firefox:**
+            1. Download `remark-firefox.zip`
+            2. Unzip the file
+            3. Open Firefox and go to `about:debugging#/runtime/this-firefox`
+            4. Click "Load Temporary Add-on"
+            5. Select any file in the unzipped folder
+
+            ### Features
+            - Sync bookmarks with GitHub Gist
+            - AI-powered content enrichment
+            - Multi-browser support
+            - Auto-sync capabilities
+
+            ### Download
+            Choose the appropriate version for your browser:
+            - Chrome/Edge: `remark-chrome.zip`
+            - Firefox: `remark-firefox.zip`
+          files: |
+            extension/remark-chrome.zip
+            extension/remark-firefox.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: extensions-${{ steps.version.outputs.version }}
+          path: |
+            extension/remark-chrome.zip
+            extension/remark-firefox.zip
+          retention-days: 30

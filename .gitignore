@@ -1,0 +1,10 @@
+node_modules
+.output
+dist
+.vercel
+.env
+.env.*
+!.env.example
+.wxt
+bun.lockb
+.astro
