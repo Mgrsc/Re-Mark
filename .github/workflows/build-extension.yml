@@ -16,21 +16,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: extension/package-lock.json
+          bun-version: latest
 
       - name: Install dependencies
-        run: cd extension && npm ci
+        run: cd extension && bun install --frozen-lockfile
 
       - name: Build Chrome extension
-        run: cd extension && npm run build
+        run: cd extension && bun run build
 
       - name: Build Firefox extension
-        run: cd extension && npm run build:firefox
+        run: cd extension && bun run build:firefox
 
       - name: Create Chrome ZIP
         run: cd extension/.output/chrome-mv3 && zip -r ../../remark-chrome.zip .
