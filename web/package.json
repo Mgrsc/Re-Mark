@@ -1,0 +1,16 @@
+{
+  "name": "web",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev --host 0.0.0.0",
+    "build": "astro build",
+    "preview": "astro preview --host 0.0.0.0",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/vercel": "^9.0.2",
+    "@aws-sdk/client-s3": "^3.947.0",
+    "astro": "^5.16.4"
+  }
+}

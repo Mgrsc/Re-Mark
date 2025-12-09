@@ -1,0 +1,111 @@
+/* Re:Mark Sketch Theme
+ * Copy this into your extension's CSS or import it.
+ */
+
+/* 1. Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Gloria+Hallelujah&family=Patrick+Hand&display=swap');
+
+:root {
+  /* Colors */
+  --bg-paper: #fdfbf7;
+  --ink-black: #2c3e50;
+  --pencil-gray: #7f8c8d;
+
+  /* Shadows */
+  --shadow-hard: 4px 4px 0px 0px rgba(44, 62, 80, 0.2);
+  --shadow-hover: 6px 6px 0px 0px rgba(44, 62, 80, 0.4);
+
+  /* Borders */
+  --border-width: 2px;
+  --border-radius-sketch: 255px 15px 225px 15px / 15px 225px 15px 255px;
+}
+
+body {
+  font-family: 'Patrick Hand', cursive;
+  background-color: var(--bg-paper);
+  /* Paper Texture */
+  background-image:
+    radial-gradient(#d0d0d0 1px, transparent 1px),
+    radial-gradient(#d0d0d0 1px, transparent 1px);
+  background-size: 20px 20px;
+  background-position: 0 0, 10px 10px;
+  color: var(--ink-black);
+}
+
+/* Titles */
+h1, h2, h3, .title {
+  font-family: 'Gloria Hallelujah', cursive;
+  font-weight: 700;
+  color: var(--ink-black);
+}
+
+/* Cards / Containers */
+.card, .box {
+  background: #fff;
+  border: var(--border-width) solid var(--ink-black);
+  /* Random-ish border radius usually requires inline styles for variety,
+     but here is a good default "wobbly" shape */
+  border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+  box-shadow: var(--shadow-hard);
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.card:hover {
+  transform: translate(-2px, -4px) rotate(-1deg);
+  box-shadow: var(--shadow-hover);
+  z-index: 10;
+}
+
+/* Inputs */
+input, textarea, select {
+  font-family: 'Patrick Hand', cursive;
+  border: 2px solid var(--ink-black);
+  border-radius: 255px 25px 225px 25px / 25px 225px 25px 255px;
+  padding: 12px 24px;
+  font-size: 1rem;
+  background: #fff;
+  color: var(--ink-black);
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.1);
+  outline: none;
+}
+
+input:focus {
+  box-shadow: 4px 4px 0 rgba(0,0,0,0.2);
+  transform: scale(1.01);
+}
+
+/* Buttons */
+button, .btn {
+  font-family: 'Patrick Hand', cursive;
+  font-weight: 700;
+  cursor: pointer;
+  border: 2px solid var(--ink-black);
+  background: #fff;
+  color: var(--ink-black);
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.2);
+  transition: all 0.1s;
+}
+
+button:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 rgba(0,0,0,0.2);
+  background: #f0f0f0;
+}
+
+button:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 rgba(0,0,0,0.2);
+}
+
+/* Tags */
+.tag {
+  display: inline-block;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border: 2px solid var(--ink-black);
+  border-radius: 15px 225px 255px 15px / 255px 15px 225px 15px;
+  background: #fff;
+  color: var(--ink-black);
+  transform: rotate(-2deg);
+}

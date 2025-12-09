@@ -8,3 +8,6 @@ dist
 .wxt
 bun.lockb
 .astro
+
+# test files
+web/src/pages/api/test-github.ts

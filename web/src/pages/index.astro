@@ -1,0 +1,747 @@
+---
+export const prerender = false;
+
+if (Astro.response) {
+  Astro.response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  Astro.response.headers.set('Pragma', 'no-cache');
+  Astro.response.headers.set('Expires', '0');
+}
+
+interface BookmarkItem {
+  id: string;
+  parentId?: string;
+  title: string;
+  url?: string;
+  order: number;
+  createdAt: number;
+  ai?: {
+    title?: string;
+    summary: string;
+    tags: string[];
+    cover: string;
+    enrichedAt: number;
+  };
+  aiFailed?: {
+    reason: string;
+    attempts: number;
+    failedAt: number;
+  };
+}
+
+interface SyncData {
+  version: string;
+  updatedAt: number;
+  browser: string;
+  items: BookmarkItem[];
+}
+
+function normalizeGistRawUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === 'gist.githubusercontent.com' || parsed.hostname === 'gist.github.com') {
+      const parts = parsed.pathname.split('/').filter(Boolean);
+      const rawIndex = parts.indexOf('raw');
+      if (rawIndex !== -1) {
+        const beforeRaw = parts.slice(0, rawIndex + 1);
+        const afterRaw = parts.slice(rawIndex + 1);
+        if (afterRaw.length >= 2) {
+          afterRaw.shift();
+        }
+        parsed.pathname = '/' + [...beforeRaw, ...afterRaw].join('/');
+        return parsed.toString();
+      }
+    }
+  } catch (e) {}
+  return url;
+}
+
+const GIST_URL = normalizeGistRawUrl(import.meta.env.GIST_RAW_URL || '');
+const DISABLE_ONLINE_FAVICON =
+  ['true', '1', 'yes'].includes((import.meta.env.DISABLE_ONLINE_FAVICON || '').toString().toLowerCase());
+
+console.log('[Server] Original GIST_RAW_URL:', import.meta.env.GIST_RAW_URL);
+console.log('[Server] Normalized GIST_URL:', GIST_URL);
+
+let data: SyncData | null = null;
+let errorMsg = '';
+
+if (GIST_URL) {
+  try {
+    const urlWithTimestamp = GIST_URL + '?_t=' + Date.now();
+    const response = await fetch(urlWithTimestamp, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+      }
+    });
+
+    if (!response.ok) {
+      if (response.status === 403 || response.status === 429) {
+        const resetHeader = response.headers.get('x-ratelimit-reset');
+        const remaining = response.headers.get('x-ratelimit-remaining');
+
+        console.error('[Rate Limit] GitHub API rate limit exceeded', {
+          status: response.status,
+          remaining,
+          reset: resetHeader
+        });
+
+        if (resetHeader) {
+          const resetTime = new Date(parseInt(resetHeader) * 1000);
+          const waitMinutes = Math.ceil((resetTime.getTime() - Date.now()) / 60000);
+          errorMsg = `RATE_LIMIT:${waitMinutes}`;
+        } else {
+          errorMsg = 'RATE_LIMIT:10';
+        }
+      } else {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+    } else {
+      data = await response.json();
+    }
+  } catch (err) {
+    if (!errorMsg.startsWith('RATE_LIMIT:')) {
+      console.error('Failed to fetch bookmarks:', err);
+      errorMsg = err instanceof Error ? err.message : String(err);
+    }
+  }
+} else {
+  errorMsg = 'GIST_RAW_URL environment variable is missing.';
+}
+
+const bookmarks = data?.items?.filter(item => item.url) || [];
+const enrichedCount = bookmarks.filter(item => item.ai).length;
+const pendingCount = bookmarks.filter(item => !item.ai && !item.aiFailed).length;
+
+function getHashCode(str: string) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = Math.imul(31, hash) + str.charCodeAt(i) | 0;
+  }
+  return hash;
+}
+
+function getDomain(urlStr: string | undefined): string {
+  if (!urlStr) return '';
+  try {
+    return new URL(urlStr).hostname;
+  } catch (e) {
+    return urlStr;
+  }
+}
+
+function getIconColors(domain: string) {
+  const hash = getHashCode(domain);
+
+  const colorSchemes = [
+    { hue: 239, sat: 70, light: 85, name: 'Indigo' },
+    { hue: 350, sat: 75, light: 85, name: 'Rose' },
+    { hue: 158, sat: 50, light: 82, name: 'Emerald' },
+    { hue: 38, sat: 80, light: 80, name: 'Amber' },
+    { hue: 258, sat: 70, light: 85, name: 'Violet' },
+    { hue: 199, sat: 75, light: 82, name: 'Sky' },
+    { hue: 330, sat: 70, light: 85, name: 'Pink' },
+    { hue: 173, sat: 50, light: 80, name: 'Teal' },
+    { hue: 25, sat: 85, light: 82, name: 'Orange' },
+    { hue: 189, sat: 80, light: 80, name: 'Cyan' },
+  ];
+
+  const scheme = colorSchemes[Math.abs(hash) % colorSchemes.length];
+
+  const bgLight = 94 + (Math.abs(hash) % 4);
+  const bgSat = 20 + (Math.abs(hash) % 20);
+
+  const textLight = 15 + (Math.abs(hash) % 10);
+  const textSat = scheme.sat - 20;
+
+  return {
+    bg: `hsla(${scheme.hue}, ${bgSat}%, ${bgLight}%, 1)`,
+    text: `hsla(${scheme.hue}, ${textSat}%, ${textLight}%, 1)`,
+    border: `hsla(${scheme.hue}, 20%, 20%, 1)`,
+    fill: `hsla(${scheme.hue}, ${scheme.sat}%, ${scheme.light}%, 1)`
+  };
+}
+
+function getCardSize(id: string, index: number) {
+  const hash = getHashCode(id) + (index * 7919);
+  const rand = Math.abs(hash) % 100;
+
+  if (rand < 10) return 'col-span-2 row-span-2 big';
+  if (rand < 25) return 'row-span-2 tall';
+  if (rand < 45) return 'col-span-2 wide';
+  return 'standard';
+}
+
+function getRandomStyles(id: string) {
+  const hash = getHashCode(id);
+  const seed = Math.abs(hash);
+
+  const rotation = ((seed % 5) - 2);
+
+  const r1 = 230 + (seed % 25);
+  const r2 = 10 + (Math.floor(seed / 4) % 15);
+  const r3 = 220 + (Math.floor(seed / 8) % 35);
+  const r4 = 15 + (Math.floor(seed / 16) % 10);
+
+  const sketchBorder = `${255 - (seed % 10)}px ${15 + (seed % 5)}px ${225 + (seed % 10)}px ${15 + (seed % 5)}px / ${15 + (seed % 5)}px ${225 + (seed % 10)}px ${15 + (seed % 5)}px ${255 - (seed % 10)}px`;
+
+  return {
+    rotation,
+    sketchBorder,
+    borderWidth: 2 + (seed % 2)
+  };
+}
+
+const emojis = ['⚡', '✨', '🔥', '💧', '🌿', '🔮', '🧬', '🚀', '🛸', '🪐', '🌊', '🏔️', '🏛️', '🎨', '🎲', '🧩', '🎸', '📷', '📚', '💡', '🧠', '⚙️', '💎', '🔑', '🎯', '👾', '🤖', '🎃', '🦄', '🐲', '⭐', '🌟', '💫', '🌈', '🎭', '🎪', '🎬', '🎮', '🎯', '🎨', '🌺', '🌸', '🌼', '🍀', '🦋', '🐝', '🦁', '🦊', '🐻', '🐼'];
+
+function getSymbol(title: string, domain: string) {
+  const hash = getHashCode(domain);
+  const useEmoji = Math.abs(hash) % 2 === 0;
+
+  if (useEmoji) {
+    return emojis[Math.abs(hash) % emojis.length];
+  } else {
+    const t = title || domain || '?';
+    return /^[a-zA-Z]/.test(t) ? t.charAt(0).toUpperCase() : t.charAt(0);
+  }
+}
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Re:Mark</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Gloria+Hallelujah&family=Patrick+Hand&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-paper: #fdfbf7;
+      --ink-black: #2c3e50;
+      --pencil-gray: #7f8c8d;
+      
+      --shadow-hard: 4px 4px 0px 0px rgba(44, 62, 80, 0.2);
+      --shadow-hover: 6px 6px 0px 0px rgba(44, 62, 80, 0.4);
+      
+      --grid-gap: 24px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Patrick Hand', cursive;
+      background-color: var(--bg-paper);
+      background-image:
+        radial-gradient(#d0d0d0 1px, transparent 1px),
+        radial-gradient(#d0d0d0 1px, transparent 1px);
+      background-size: 20px 20px;
+      background-position: 0 0, 10px 10px;
+      color: var(--ink-black);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-bottom: 80px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1200px;
+      padding: 0 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 40px;
+    }
+
+    /* Header Design - Sketch Style */
+    .header-wrapper {
+      position: sticky;
+      top: 20px;
+      z-index: 100;
+      width: 100%;
+      max-width: 1200px;
+      margin: 20px auto 0;
+      padding: 0 24px;
+    }
+
+    .header {
+      background: #fff;
+      border: 3px solid var(--ink-black);
+      border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--shadow-hard);
+      transition: transform 0.2s;
+    }
+    
+    .header:hover {
+        transform: scale(1.01) rotate(-0.5deg);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+
+    .logo {
+      font-family: 'Gloria Hallelujah', cursive;
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: var(--ink-black);
+      transform: rotate(-3deg);
+      text-shadow: 2px 2px 0px rgba(0,0,0,0.1);
+    }
+    
+    .logo-dot { color: #e74c3c; font-size: 3rem; line-height: 0.5; }
+
+    .search-bar {
+      flex: 1;
+      max-width: 480px;
+      margin: 0 40px;
+      position: relative;
+    }
+
+    .search-input {
+      width: 100%;
+      height: 50px;
+      background: #fff;
+      border: 2px solid var(--ink-black);
+      border-radius: 255px 25px 225px 25px / 25px 225px 25px 255px;
+      padding: 0 24px 0 52px;
+      font-family: 'Patrick Hand', cursive;
+      font-size: 1.2rem;
+      color: var(--ink-black);
+      box-shadow: 2px 2px 0 rgba(0,0,0,0.1);
+      transition: all 0.2s ease;
+    }
+
+    .search-input:focus {
+      outline: none;
+      box-shadow: 4px 4px 0 rgba(0,0,0,0.2);
+      transform: scale(1.02);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--ink-black);
+      pointer-events: none;
+    }
+
+    .controls { display: flex; align-items: center; gap: 16px; }
+
+    .stats-pill {
+      font-family: 'Patrick Hand', cursive;
+      font-size: 1.1rem;
+      font-weight: 700;
+      border-bottom: 3px solid rgba(99, 102, 241, 0.3);
+      padding: 0 8px;
+    }
+
+    .icon-btn {
+      width: 44px;
+      height: 44px;
+      border: 2px solid var(--ink-black);
+      border-radius: 50%;
+      background: #fff;
+      color: var(--ink-black);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 2px 2px 0 rgba(0,0,0,0.2);
+      transition: all 0.1s;
+    }
+
+    .icon-btn:hover {
+      transform: translate(-1px, -1px);
+      box-shadow: 4px 4px 0 rgba(0,0,0,0.2);
+      background: #f0f0f0;
+    }
+
+    .icon-btn:active {
+      transform: translate(2px, 2px);
+      box-shadow: 0 0 0 rgba(0,0,0,0.2);
+    }
+
+    .grid-container {
+      margin-top: 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      grid-auto-flow: dense; 
+      gap: 24px;
+      padding-bottom: 40px;
+    }
+
+    .card {
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+      border: 2px solid var(--ink-black);
+      padding: 24px;
+      text-decoration: none;
+      position: relative;
+      transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+      box-shadow: var(--shadow-hard);
+      overflow: hidden; 
+    }
+
+    .card:hover {
+      box-shadow: var(--shadow-hover);
+      z-index: 10;
+    }
+
+    .card-icon {
+      width: 50px;
+      height: 50px;
+      border: 2px solid var(--ink-black);
+      border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; 
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+      font-size: 24px;
+      overflow: hidden;
+      background: #fff;
+      box-shadow: 2px 2px 0 rgba(0,0,0,0.1);
+    }
+    
+    .card-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: inherit; 
+    }
+
+    .card-title {
+      font-family: 'Gloria Hallelujah', cursive;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--ink-black);
+      margin-bottom: 8px;
+      line-height: 1.2;
+      
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    
+    .card-desc {
+      font-family: 'Patrick Hand', cursive;
+      font-size: 1.1rem;
+      color: var(--pencil-gray);
+      line-height: 1.3;
+      margin-bottom: 16px;
+      flex: 1;
+      
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .card-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: auto;
+    }
+
+    .tag {
+      font-size: 0.9rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border: 2px solid var(--ink-black);
+      border-radius: 15px 225px 255px 15px / 255px 15px 225px 15px;
+      background: #fff;
+      color: var(--ink-black);
+      transform: rotate(-2deg);
+      transition: transform 0.2s;
+    }
+
+    .tag:hover {
+        transform: rotate(2deg) scale(1.1);
+        background: #ffff00;
+    }
+
+    .col-span-2 { grid-column: span 2; }
+    .row-span-2 { grid-row: span 2; }
+
+    .big .card-title { font-size: 2rem; }
+    .big .card-desc { font-size: 1.3rem; -webkit-line-clamp: 5; }
+    .wide .card-desc { -webkit-line-clamp: 4; }
+    .tall .card-desc { -webkit-line-clamp: 6; }
+
+    .hidden { display: none !important; }
+
+    .loading-scribble {
+        display: inline-block;
+        font-weight: bold;
+        animation: scribble 0.5s infinite alternate;
+    }
+    @keyframes scribble { from { opacity: 0.5; transform: rotate(-5deg); } to { opacity: 1; transform: rotate(5deg); } }
+
+    @media (max-width: 1024px) {
+      .header { flex-direction: column; gap: 16px; height: auto; }
+      .search-bar { width: 100%; max-width: none; margin: 0; }
+    }
+    
+    @media (max-width: 640px) {
+       .col-span-2, .row-span-2 { grid-column: span 1; grid-row: span 1; }
+       .brand { flex-direction: column; }
+       .logo { font-size: 2rem; }
+       .header-wrapper { position: static; margin-bottom: 20px; }
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 80px 20px;
+        font-family: 'Gloria Hallelujah', cursive;
+        color: var(--pencil-gray);
+        font-size: 1.5rem;
+        grid-column: 1 / -1;
+    }
+  </style>
+</head>
+<body>
+  
+  <div class="header-wrapper">
+    <header class="header">
+      <a href="/" class="brand">
+        <div class="logo">
+          Re:Mark<span class="logo-dot">.</span>
+        </div>
+      </a>
+
+      <div class="search-bar">
+        <input type="text" id="searchInput" class="search-input" placeholder="Search sketches..." autocomplete="off">
+        <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      </div>
+
+      <div class="controls">
+        <div class="stats-pill">
+          {enrichedCount} <span style="opacity:0.5; margin:0 4px">/</span> {bookmarks.length}
+        </div>
+        
+        <button id="refreshBtn" class="icon-btn" title="Refresh">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+  </div>
+
+  <div class="container">
+    {bookmarks.length > 0 ? (
+      <div class="grid-container" id="bookmarkGrid">
+        {bookmarks.map((item, index) => {
+          const domain = getDomain(item.url);
+          const { bg, text, border, gradient } = getIconColors(domain);
+          const sizeClass = getCardSize(item.id, index);
+          const displayTitle = item.ai?.title || item.title;
+          const symbol = getSymbol(displayTitle, domain);
+          const randomStyles = getRandomStyles(item.id);
+          const useOnlineIcon = !DISABLE_ONLINE_FAVICON && item.ai && item.ai.cover;
+
+          const tagHash = Math.abs(getHashCode(item.id + 'tag'));
+          const tagHues = [239, 350, 158, 38, 258, 199, 330, 173];
+          const tagHue = tagHues[tagHash % tagHues.length];
+          const tagBg = `hsla(${tagHue}, 80%, 90%, 1)`;
+
+          return (
+            <a
+              href={item.url}
+              target="_blank"
+              rel="noopener"
+              class={`card ${sizeClass}`}
+              style={`
+                transform: rotate(${randomStyles.rotation}deg);
+                border-radius: ${randomStyles.sketchBorder};
+                border-width: ${randomStyles.borderWidth}px;
+                --hover-scale: 1.02;
+              `}
+              data-domain={domain}
+              data-symbol={symbol}
+              data-bg={bg}
+              data-text={text}
+              data-disable-online={DISABLE_ONLINE_FAVICON}
+              onmouseenter="this.style.transform=`translate(-2px, -4px) rotate(${randomStyles.rotation - 1}deg) scale(var(--hover-scale))`"
+              onmouseleave={`this.style.transform='rotate(${randomStyles.rotation}deg)'`}
+            >
+              <div
+                class="card-icon"
+                style={`
+                  background: ${bg};
+                  color: ${text};
+                `}
+              >
+                {useOnlineIcon ? (
+                  <img
+                    src={item.ai.cover}
+                    alt={displayTitle}
+                    loading="lazy"
+                    data-fallback-domain={domain}
+                    onerror="handleImageError(this)"
+                  />
+                ) : (
+                  <span>{symbol}</span>
+                )}
+              </div>
+
+              <div style="flex: 1; display: flex; flex-direction: column;">
+                <h3 class="card-title">
+                  {displayTitle}
+                </h3>
+
+                {item.ai ? (
+                  <>
+                    <p class="card-desc">{item.ai.summary || 'No scribbles yet.'}</p>
+                    <div class="card-tags">
+                      {item.ai.tags.slice(0, sizeClass.includes('big') ? 6 : sizeClass.includes('wide') || sizeClass.includes('tall') ? 4 : 3).map(tag => (
+                        <span class="tag" style={`background: ${tagBg}`}>
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                ) : item.aiFailed ? (
+                  <div style="margin-top: auto; display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: #c0392b; font-weight: bold;">
+                    <span>✕ Failed</span>
+                  </div>
+                ) : (
+                  <div style="margin-top: auto; display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--pencil-gray);">
+                    <span class="loading-scribble">✎</span>
+                    <span>Sketching...</span>
+                  </div>
+                )}
+              </div>
+            </a>
+          );
+        })}
+      </div>
+    ) : (
+      <div class="empty-state">
+        {errorMsg ? (
+          errorMsg.startsWith('RATE_LIMIT:') ? (
+            <div style="text-align: center; max-width: 600px; margin: 0 auto;">
+              <div style="font-size: 4rem; margin-bottom: 24px;">⏱️</div>
+              <p style="font-weight: 700; font-size: 1.5rem; color: #f59e0b; margin-bottom: 16px;">
+                GitHub API Rate Limit
+              </p>
+              <p style="font-size: 1rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 24px;">
+                Please wait <strong style="color: #f59e0b;">{errorMsg.split(':')[1]} minutes</strong>.
+              </p>
+              <button
+                onclick="location.reload()"
+                style="padding: 12px 32px; background: #f59e0b; color: white; border: none; border-radius: 99px; font-weight: 600; cursor: pointer;"
+              >
+                Refresh
+              </button>
+            </div>
+          ) : (
+            <div>
+              <p style="font-weight: 600; font-size: 1.25rem; color: #ef4444;">Unable to load bookmarks</p>
+              <p style="margin-top: 8px; opacity: 0.7">{errorMsg}</p>
+            </div>
+          )
+        ) : (
+          <p>Your collection is empty.</p>
+        )}
+      </div>
+    )}
+  </div>
+
+  <script is:inline>
+    // Search Functionality
+    const searchInput = document.getElementById('searchInput');
+    const grid = document.getElementById('bookmarkGrid');
+    
+    if (searchInput && grid) {
+        searchInput.addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase().trim();
+            const cards = grid.querySelectorAll('.card');
+            
+            cards.forEach(card => {
+                const title = card.querySelector('.card-title')?.textContent?.toLowerCase() || '';
+                const desc = card.querySelector('.card-desc')?.textContent?.toLowerCase() || '';
+                const tags = Array.from(card.querySelectorAll('.tag')).map(t => t.textContent.toLowerCase()).join(' ');
+                
+                if (title.includes(term) || desc.includes(term) || tags.includes(term)) {
+                    card.classList.remove('hidden');
+                } else {
+                    card.classList.add('hidden');
+                }
+            });
+        });
+    }
+
+    function handleImageError(img) {
+      const card = img.closest('.card');
+      const domain = img.dataset.fallbackDomain;
+      const symbol = card.dataset.symbol;
+      const bg = card.dataset.bg;
+      const text = card.dataset.text;
+
+      const hash = symbol.charCodeAt(0);
+      const svg = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 100 100">
+          <defs>
+            <linearGradient id="grad${hash}" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style="stop-color:${bg};stop-opacity:1" />
+              <stop offset="100%" style="stop-color:${text};stop-opacity:0.2" />
+            </linearGradient>
+          </defs>
+          <rect width="100" height="100" fill="url(#grad${hash})"/>
+          <text x="50" y="58" font-family="'Syne', sans-serif" font-weight="700" font-size="50" fill="${text}" text-anchor="middle" dominant-baseline="middle">
+            ${symbol}
+          </text>
+        </svg>
+      `;
+      img.src = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+      img.onerror = null;
+    }
+  </script>
+
+  {pendingCount > 0 && (
+    <script define:vars={{ pendingCount }}>
+      (async function() {
+        const interval = setInterval(async () => {
+          try {
+            const response = await fetch('/api/bookmarks?t=' + Date.now());
+            if (!response.ok) return;
+            const data = await response.json();
+            const stillPending = data.items.filter(i => i.url && !i.ai && !i.aiFailed);
+            if (stillPending.length < pendingCount) location.reload();
+            if (stillPending.length === 0) clearInterval(interval);
+          } catch (e) { console.error(e); }
+        }, 10000);
+      })();
+    </script>
+  )}
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const refreshBtn = document.getElementById('refreshBtn');
+      if (refreshBtn) {
+        refreshBtn.addEventListener('click', function(e) {
+          e.preventDefault();
+          const svg = this.querySelector('svg');
+          if (svg) svg.style.animation = 'spin 0.6s cubic-bezier(0.6, 0, 0.4, 1) infinite';
+          setTimeout(() => window.location.reload(true), 200);
+        });
+      }
+    });
+  </script>
+</body>
+</html>
