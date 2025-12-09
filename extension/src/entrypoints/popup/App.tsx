@@ -98,7 +98,7 @@ export default function App() {
         <div className="logo-area">
           <img src="/icon/48.png" className="logo-image" alt="Re:Mark" />
           <div>
-            <h1>Re:Mark</h1>
+            <h1>Re:Mark<span style={{ color: '#e74c3c', fontSize: '2rem', lineHeight: 0.5 }}>.</span></h1>
             <p>{t.subtitle}</p>
           </div>
         </div>

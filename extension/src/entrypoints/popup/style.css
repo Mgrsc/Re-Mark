@@ -1,18 +1,24 @@
+/* Sketch Theme for Extension Popup */
+
+/* 1. Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Gloria+Hallelujah&family=Patrick+Hand&display=swap');
+
 :root {
-  --primary-gradient: linear-gradient(135deg, #475569 0%, #64748b 100%);
-  --secondary-gradient: linear-gradient(135deg, #334155 0%, #475569 100%);
-  --upload-gradient: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-  --download-gradient: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-  --enrich-gradient: linear-gradient(135deg, #0ea5e9 0%, #22d3ee 100%);
-  --bg-color: #f8fafc;
-  --card-bg: #ffffff;
-  --text-main: #0f172a;
-  --text-muted: #64748b;
-  --border-color: #e2e8f0;
-  --btn-secondary-bg: #f1f5f9;
-  --btn-secondary-hover: #e2e8f0;
-  --hover-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
-  --active-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  /* Colors */
+  --bg-paper: #fdfbf7;
+  --ink-black: #2c3e50;
+  --pencil-gray: #7f8c8d;
+  --success-green: #27ae60;
+  --info-blue: #2980b9;
+  --danger-red: #c0392b;
+
+  /* Shadows */
+  --shadow-hard: 3px 3px 0px 0px rgba(44, 62, 80, 0.2);
+  --shadow-hover: 5px 5px 0px 0px rgba(44, 62, 80, 0.3);
+
+  /* Borders */
+  --border-width: 2px;
+  --border-radius-sketch: 255px 15px 225px 15px / 15px 225px 15px 255px;
 }
 
 * {
@@ -22,10 +28,16 @@
 }
 
 body {
-  width: 340px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  background-color: var(--bg-color);
-  color: var(--text-main);
+  width: 360px; /* Slightly wider to accommodate sketch borders */
+  font-family: 'Patrick Hand', cursive;
+  background-color: var(--bg-paper);
+  /* Paper Texture */
+  background-image:
+    radial-gradient(#d0d0d0 1px, transparent 1px),
+    radial-gradient(#d0d0d0 1px, transparent 1px);
+  background-size: 20px 20px;
+  background-position: 0 0, 10px 10px;
+  color: var(--ink-black);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -36,10 +48,15 @@ body {
   gap: 1.5rem;
 }
 
+/* Header */
 .popup-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  border-bottom: 2px solid var(--ink-black);
+  padding-bottom: 1rem;
+  margin-bottom: 0.5rem;
+  border-radius: 255px 15px 15px 255px / 15px 15px 5px 5px; /* Subtle sketch line */
 }
 
 .logo-area {
@@ -51,75 +68,88 @@ body {
 .logo-image {
   width: 36px;
   height: 36px;
-  border-radius: 8px;
-  object-fit: contain;
+  border: 2px solid var(--ink-black);
+  border-radius: 50% 40% 60% 50% / 40% 60% 50% 50%;
+  padding: 2px;
+  background: #fff;
 }
 
 .popup-header h1 {
-  font-size: 1.125rem;
+  font-family: 'Gloria Hallelujah', cursive;
+  font-size: 1.5rem;
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1;
+  transform: rotate(-2deg);
 }
 
 .popup-header p {
-  font-size: 0.75rem;
-  color: var(--text-muted);
+  font-size: 0.9rem;
+  color: var(--pencil-gray);
   font-weight: 500;
 }
 
 .icon-btn {
   background: transparent;
   border: none;
-  color: var(--text-muted);
+  color: var(--ink-black);
   padding: 0.5rem;
-  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 50%;
 }
 
 .icon-btn:hover {
-  background-color: rgba(71, 85, 105, 0.1);
-  color: #334155;
+  transform: scale(1.1) rotate(10deg);
+  background: rgba(0,0,0,0.05);
 }
 
+/* Stats */
 .stats-container {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
+  gap: 1rem;
 }
 
 .stat-card {
-  background: var(--card-bg);
+  background: #fff;
   padding: 0.875rem;
-  border-radius: 12px;
+  border: 2px solid var(--ink-black);
+  border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-hard);
+  transition: transform 0.2s;
+}
+
+.stat-card:hover {
+  transform: translate(-1px, -2px) rotate(-1deg);
+  box-shadow: var(--shadow-hover);
 }
 
 .stat-icon {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border: 2px solid var(--ink-black);
+  border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  font-weight: bold;
 }
 
 .stat-icon.local {
   background: #f1f5f9;
-  color: #475569;
+  color: var(--ink-black);
 }
 
 .stat-icon.remote {
   background: #f0fdf4;
-  color: #15803d;
+  color: var(--success-green);
 }
 
 .stat-info {
@@ -128,38 +158,33 @@ body {
 }
 
 .stat-value {
-  font-size: 1.125rem;
+  font-family: 'Gloria Hallelujah', cursive;
+  font-size: 1.25rem;
   font-weight: 700;
   line-height: 1;
-  margin-bottom: 0.125rem;
 }
 
 .stat-label {
-  font-size: 0.6875rem;
-  color: var(--text-muted);
+  font-size: 0.8rem;
+  color: var(--pencil-gray);
   text-transform: uppercase;
-  letter-spacing: 0.025em;
   font-weight: 600;
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
-.icon-help {
-  color: var(--text-muted);
-  opacity: 0.7;
-  display: flex;
-}
-
+/* Actions */
 .actions-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
+  gap: 1rem;
 }
 
 .action-card {
-  border: none;
-  border-radius: 12px;
+  font-family: 'Patrick Hand', cursive;
+  border: 2px solid var(--ink-black);
+  border-radius: 255px 25px 225px 25px / 25px 225px 25px 255px;
   padding: 1rem;
   display: flex;
   flex-direction: column;
@@ -167,83 +192,86 @@ body {
   justify-content: center;
   gap: 0.5rem;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  color: var(--text-main);
-  font-weight: 600;
-  font-size: 0.875rem;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-  background: var(--btn-secondary-bg);
+  transition: all 0.2s;
+  color: var(--ink-black);
+  font-weight: 700;
+  font-size: 1rem;
+  background: #fff;
+  box-shadow: var(--shadow-hard);
   position: relative;
-  overflow: hidden;
+  overflow: visible; /* Allow rotation */
 }
 
 .action-card:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: var(--hover-shadow);
-  filter: brightness(0.98);
-  background: var(--btn-secondary-hover);
+  transform: translate(-2px, -3px) rotate(1deg);
+  box-shadow: var(--shadow-hover);
+  background: #fafafa;
+  z-index: 10;
 }
 
 .action-card:active:not(:disabled) {
-  transform: translateY(0);
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 0;
 }
 
 .action-card:disabled {
-  opacity: 0.7;
+  opacity: 0.6;
   cursor: wait;
   transform: none;
+  box-shadow: none;
 }
 
 .action-card.primary {
-  background: var(--upload-gradient);
-  color: white;
-  box-shadow: 0 12px 32px -14px rgba(34, 197, 94, 0.65);
+  /* Greenish hint */
+  background: #eaffea;
 }
-.action-card.primary .action-icon {
-  background: rgba(255,255,255,0.2);
-  color: white;
+.action-card.primary:hover:not(:disabled) {
+  background: #d4fcd4;
 }
 
 .action-card.secondary {
-  background: var(--download-gradient);
-  color: white;
-  box-shadow: 0 12px 32px -14px rgba(99, 102, 241, 0.65);
+  /* Blueish hint */
+  background: #eaf6ff;
 }
-.action-card.secondary .action-icon {
-  background: rgba(255,255,255,0.5);
-  color: white;
+.action-card.secondary:hover:not(:disabled) {
+  background: #d4effc;
 }
 
 .action-card.enrich {
-  background: var(--enrich-gradient);
-  color: white;
-  box-shadow: 0 14px 36px -14px rgba(14, 165, 233, 0.65);
+  /* Purple/Pink hint */
+  background: #fdf2f8;
 }
-.action-card.enrich .action-icon {
-  background: rgba(255,255,255,0.2);
-  color: white;
+.action-card.enrich:hover:not(:disabled) {
+  background: #fce7f3;
 }
 
 .action-card.full-width {
   grid-column: span 2;
   flex-direction: row;
   padding: 0.875rem;
+  transform: rotate(-1deg);
+}
+.action-card.full-width:hover:not(:disabled) {
+    transform: translate(-2px, -3px) rotate(0deg);
 }
 
 .action-icon {
   width: 32px;
   height: 32px;
+  border: 2px solid var(--ink-black);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: #fff;
 }
 
+/* Footer */
 .popup-footer {
   display: flex;
   justify-content: center;
   padding-top: 0.75rem;
-  border-top: 1px solid var(--border-color);
+  border-top: 2px dashed var(--pencil-gray);
   margin-top: -0.5rem;
 }
 
@@ -253,19 +281,23 @@ body {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 500;
+  font-family: 'Patrick Hand', cursive;
+  font-size: 0.9rem;
+  font-weight: 700;
   cursor: pointer;
   padding: 0.5rem 1rem;
-  border-radius: 6px;
-  transition: background 0.2s;
-  color: var(--text-muted);
+  color: var(--pencil-gray);
+  transition: all 0.2s;
+}
+
+.text-btn:hover {
+  color: var(--danger-red);
+  transform: scale(1.05) rotate(-2deg);
 }
 
 .text-btn.danger {
-  color: #ef4444;
+  color: var(--pencil-gray);
 }
-
 .text-btn.danger:hover {
-  background: #fef2f2;
+  color: var(--danger-red);
 }
