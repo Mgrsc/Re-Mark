@@ -1,6 +1,9 @@
 ---
 export const prerender = false;
 
+import SpeedInsights from "@vercel/speed-insights/astro";
+import Analytics from "@vercel/analytics/astro";
+
 if (Astro.response) {
   Astro.response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   Astro.response.headers.set('Pragma', 'no-cache');
@@ -743,5 +746,8 @@ function getSymbol(title: string, domain: string) {
       }
     });
   </script>
+
+  <Analytics />
+  <SpeedInsights />
 </body>
 </html>
