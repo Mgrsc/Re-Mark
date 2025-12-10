@@ -18,6 +18,11 @@
 - 🌐 **简洁 Web 界面** - 提供清爽的 Web 端浏览体验，随时随地查看你的书签
 - 🔒 **数据自托管** - Token 在本地，书签存储在你自己的 Gist，完全掌控数据安全
 
+
+<div align="center">
+<img src="./web/public/image.png" alt="Re:Mark 截图" width="600"/>
+</div>
+
 ---
 
 ## 🚀 快速开始
