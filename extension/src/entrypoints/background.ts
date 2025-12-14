@@ -147,18 +147,28 @@ async function handleUpload() {
     const items = await flattenBookmarks(tree);
     const existingData = await fetchGist(settings.githubToken, gistId).catch(() => null);
 
-    const itemMap = new Map((existingData?.items || []).map(item => [item.id, item]));
-    items.forEach(item => {
-      const existing = itemMap.get(item.id);
-      if (existing?.ai) item.ai = existing.ai;
-      itemMap.set(item.id, item);
-    });
+    if (existingData?.items) {
+      const aiByIdMap = new Map<string, any>();
+      const aiByUrlMap = new Map<string, any>();
+
+      existingData.items.forEach(item => {
+        if (item.ai) {
+          aiByIdMap.set(item.id, item.ai);
+          if (item.url) aiByUrlMap.set(item.url, item.ai);
+        }
+      });
+
+      items.forEach(item => {
+        const ai = aiByIdMap.get(item.id) || (item.url ? aiByUrlMap.get(item.url) : undefined);
+        if (ai) item.ai = ai;
+      });
+    }
 
     const syncData: SyncData = {
       version: '1.0.0',
       updatedAt: Date.now(),
       browser: navigator.userAgent,
-      items: Array.from(itemMap.values())
+      items: items
     };
 
     await updateGist(settings.githubToken, gistId, syncData);
