@@ -186,6 +186,49 @@ body {
   color: var(--info-blue);
 }
 
+/* Input with toggle button */
+.input-with-toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-toggle .input-primary {
+  padding-right: 3rem; /* Make room for the button */
+}
+
+.toggle-visibility {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--pencil-gray);
+  transition: all 0.2s;
+  border-radius: 50%;
+}
+
+.toggle-visibility:hover {
+  color: var(--ink-black);
+  background: rgba(0, 0, 0, 0.05);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.toggle-visibility:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.toggle-visibility:focus {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .field code {
   padding: 0.2rem 0.4rem;
   background: #eee;
