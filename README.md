@@ -31,11 +31,13 @@
 
 #### 安装扩展
 
-1. **下载扩展包**
-   - 前往本仓库的 [Releases](../../releases) 页面下载对应浏览器的打包扩展
-   - 或在 `extension` 目录自行构建
+1. **Chrome 网上应用店（推荐）**
+   - 直接访问 [Chrome 网上应用店 - Re:Mark](https://chromewebstore.google.com/detail/remark/pddjamjepimjeemnpmbhgcfkbkplnfkk) 点击「添加至 Chrome」
+   - 安装后在扩展的设置页填写配置（见下方配置说明）
+   - 应用商店会自动推送更新，无需手动重新加载
 
-2. **加载到浏览器**
+2. **手动加载 / 开发模式**
+   - 用于 Edge / Firefox，或需要调试最新版。可在 [Releases](../../releases) 下载打包产物，或在 `extension` 目录运行 `bun install && bun run build` 生成 `extension/.output/`。
    - **Chrome / Edge**
      1. 访问 `chrome://extensions/`（Edge 访问 `edge://extensions/`）
      2. 打开右上角的「开发者模式」
@@ -55,9 +57,6 @@
 
 4. **打包扩展**（可选）
    - 如需生成 `.crx` 或 `.xpi` 文件，可在浏览器扩展页使用「打包扩展程序」功能
-
-> **⚠️ 重要提示**
-> 由于 Chrome 商店需额外支付 5 美元注册费用，暂不计划上架商店，请直接按上面的步骤手动加载。
 
 ---
 
