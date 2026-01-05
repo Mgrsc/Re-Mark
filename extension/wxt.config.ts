@@ -3,7 +3,7 @@ import { defineConfig } from 'wxt';
 export default defineConfig({
   srcDir: 'src',
   modules: ['@wxt-dev/module-react'],
-  manifest: {
+  manifest: ({ command }) => ({
     name: "Re:Mark",
     description: "AI-enhanced bookmark knowledge base",
     default_locale: 'en',
@@ -12,7 +12,7 @@ export default defineConfig({
       "https://api.github.com/*",
       "https://gist.githubusercontent.com/*",
       "https://raw.githubusercontent.com/*",
-      "http://localhost:*/*"
+      ...(command === 'serve' ? ["http://localhost:*/*"] : [])
     ],
     optional_host_permissions: ["https://*/*", "http://*/*"],
     icons: {
@@ -29,5 +29,5 @@ export default defineConfig({
         "128": "icon/128.png"
       }
     }
-  }
+  })
 });
