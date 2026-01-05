@@ -7,7 +7,7 @@ export default defineConfig({
     name: "Re:Mark",
     description: "AI-enhanced bookmark knowledge base",
     default_locale: 'en',
-    permissions: ['storage', 'bookmarks', 'notifications'],
+    permissions: ['storage', 'bookmarks', 'notifications', 'alarms'],
     host_permissions: [
       "https://api.github.com/*",
       "https://gist.githubusercontent.com/*",

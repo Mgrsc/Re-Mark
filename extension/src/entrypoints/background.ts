@@ -2,7 +2,7 @@ import { browser } from 'wxt/browser';
 import { defineBackground } from 'wxt/utils/define-background';
 import { getSettings } from '../utils/storage';
 import { getBookmarkTree, flattenBookmarks, buildBookmarkTree, clearAllBookmarks, countBookmarks } from '../utils/bookmarks';
-import { fetchGist, updateGist, createGist } from '../utils/gist';
+import { fetchGist, updateGist } from '../utils/gist';
 import type { SyncData } from '../types';
 
 type Locale = 'en' | 'zh';
@@ -82,7 +82,7 @@ const getLocale = (): Locale => navigator.language?.toLowerCase().startsWith('zh
 const localeText = () => locales[getLocale()];
 
 let isSyncing = false;
-let syncTimeout: number | null = null;
+const SYNC_ALARM_NAME = 'auto-sync-bookmarks';
 
 const notificationIcon = '/icon/128.png';
 
@@ -102,7 +102,7 @@ const showNotification = async (title: string, message: string) => {
 export default defineBackground(() => {
   browser.runtime.onInstalled.addListener(updateLocalCount);
 
-  browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  browser.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     const actions: Record<string, () => Promise<void>> = {
       upload: handleUpload,
       download: handleDownload,
@@ -121,6 +121,12 @@ export default defineBackground(() => {
   browser.bookmarks.onRemoved.addListener(handleBookmarkChange);
   browser.bookmarks.onChanged.addListener(handleBookmarkChange);
   browser.bookmarks.onMoved.addListener(handleBookmarkChange);
+
+  browser.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === SYNC_ALARM_NAME) {
+      handleUpload().catch(() => {});
+    }
+  });
 });
 
 async function handleUpload() {
@@ -230,8 +236,10 @@ async function handleBookmarkChange() {
 
   const settings = await getSettings();
   if (settings.autoSync) {
-    if (syncTimeout) clearTimeout(syncTimeout);
-    syncTimeout = setTimeout(() => handleUpload().catch(() => {}), settings.syncDelay * 60 * 1000) as unknown as number;
+    await browser.alarms.clear(SYNC_ALARM_NAME);
+    await browser.alarms.create(SYNC_ALARM_NAME, {
+      delayInMinutes: settings.syncDelay
+    });
   }
 }
 
