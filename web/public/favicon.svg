@@ -1,7 +1,94 @@
-<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 128 128">
-    <!-- White background -->
-    <rect width="128" height="128" rx="24" fill="#ffffff"/>
-
-    <!-- Astro logo in pure black -->
-    <path d="M50.4 78.5a75.1 75.1 0 0 0-28.5 6.9l24.2-65.7c.7-2 1.9-3.2 3.4-3.2h29c1.5 0 2.7 1.2 3.4 3.2l24.2 65.7s-11.6-7-28.5-7L67 45.5c-.4-1.7-1.6-2.8-2.9-2.8-1.3 0-2.5 1.1-2.9 2.7L50.4 78.5Zm-1.1 28.2Zm-4.2-20.2c-2 6.6-.6 15.8 4.2 20.2a17.5 17.5 0 0 1 .2-.7 5.5 5.5 0 0 1 5.7-4.5c2.8.1 4.3 1.5 4.7 4.7.2 1.1.2 2.3.2 3.5v.4c0 2.7.7 5.2 2.2 7.4a13 13 0 0 0 5.7 4.9v-.3l-.2-.3c-1.8-5.6-.5-9.5 4.4-12.8l1.5-1a73 73 0 0 0 3.2-2.2 16 16 0 0 0 6.8-11.4c.3-2 .1-4-.6-6l-.8.6-1.6 1a37 37 0 0 1-22.4 2.7c-5-.7-9.7-2-13.2-6.2Z" fill="#000" />
+<svg width="100%" height="100%" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+    <!-- 定义渐变和阴影 -->
+    <defs>
+        <!-- 文档渐变 - 浅蓝色系 -->
+        <linearGradient id="docGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:#e8f0fe;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#d4e5fe;stop-opacity:1" />
+        </linearGradient>
+        
+        <!-- 折角渐变 - 深灰蓝色 -->
+        <linearGradient id="foldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#94aac7;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#7a93b0;stop-opacity:1" />
+        </linearGradient>
+        
+        <!-- 书签渐变 -->
+        <linearGradient id="bookmarkGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:#ffc107;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#ff9800;stop-opacity:1" />
+        </linearGradient>
+        
+        <!-- 阴影滤镜 -->
+        <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+            <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.3"/>
+        </filter>
+    </defs>
+    
+    <!-- 文档阴影层 -->
+    <path d="M8,2 L40,2 L40,18 L56,18 L56,62 L8,62 Z"
+          fill="#a0c0e8"
+          opacity="0.4"
+          transform="translate(2, 2)"/>
+    
+    <!-- 文档主体 - 浅蓝色渐变 -->
+    <path d="M8,2 L40,2 L40,18 L56,18 L56,62 L8,62 Z"
+          fill="url(#docGradient)"
+          stroke="#b8d4f7"
+          stroke-width="2.5"
+          filter="url(#shadow)"/>
+    
+    <!-- 折角底层阴影 -->
+    <path d="M40,2 L56,18 L40,18 Z"
+          fill="#5a7a9a"
+          opacity="0.5"
+          transform="translate(1.5, 1.5)"/>
+    
+    <!-- 折角 - 深灰蓝色，简洁设计 -->
+    <path d="M40,2 L56,18 L40,18 Z"
+          fill="url(#foldGradient)"
+          stroke="#5d7a98"
+          stroke-width="2.5"/>
+    
+    <!-- 书签阴影 -->
+    <path d="M24,24 L24,58 L29,51 L34,58 L34,24 Z"
+          fill="#cc7a00"
+          opacity="0.3"
+          transform="translate(1, 1)"/>
+    
+    <!-- 书签主体 - 保持橙黄色 -->
+    <path d="M24,24 L24,56 L29,49 L34,56 L34,24 Z"
+          fill="url(#bookmarkGradient)"
+          stroke="#e65100"
+          stroke-width="2.5"
+          filter="url(#shadow)"/>
+    
+    <!-- 书签高光 -->
+    <rect x="25" y="26" width="8" height="12"
+          fill="#ffffff"
+          opacity="0.4"
+          rx="1"/>
+    
+    <!-- 文本线条 - 深蓝色 #165cdc -->
+    <g stroke="#165cdc" stroke-width="3" stroke-linecap="round">
+        <!-- 左侧短线 -->
+        <line x1="14" y1="30" x2="20" y2="30"/>
+        <line x1="14" y1="38" x2="20" y2="38"/>
+        
+        <!-- 右侧长线 -->
+        <line x1="38" y1="30" x2="52" y2="30"/>
+        <line x1="38" y1="38" x2="52" y2="38"/>
+        
+        <!-- 底部通栏 -->
+        <line x1="14" y1="46" x2="52" y2="46"/>
+    </g>
+    
+    <!-- 文本线条高光层 -->
+    <g stroke="#4a8df8" stroke-width="1.5" stroke-linecap="round" opacity="0.5">
+        <line x1="14" y1="30" x2="20" y2="30"/>
+        <line x1="14" y1="38" x2="20" y2="38"/>
+        <line x1="38" y1="30" x2="52" y2="30"/>
+        <line x1="38" y1="38" x2="52" y2="38"/>
+        <line x1="14" y1="46" x2="52" y2="46"/>
+    </g>
 </svg>

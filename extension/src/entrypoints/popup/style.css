@@ -72,11 +72,11 @@ body {
 }
 
 .logo-image {
-  width: 36px;
-  height: 36px;
+  width: 48px;
+  height: 48px;
   border: 2px solid var(--ink-black);
   border-radius: 50% 40% 60% 50% / 40% 60% 50% 50%;
-  padding: 2px;
+  padding: 4px;
   background: #fff;
 }
 
