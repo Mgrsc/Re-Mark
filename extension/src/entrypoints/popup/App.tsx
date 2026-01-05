@@ -4,6 +4,9 @@ import { getSettings } from '../../utils/storage';
 import './style.css';
 
 const Icons = {
+  Refresh: () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+  ),
   Upload: () => (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
   ),
@@ -32,12 +35,14 @@ const locales = {
     subtitle: 'Ordinary Advanced Bookmarks',
     local: 'Local',
     remote: 'Remote',
-    remoteTip: 'Remote count updates only after Upload, Download, or Auto-sync completes.',
+    remoteTip: 'Remote count updates only after Refresh, Upload, Download, or Auto-sync completes.',
+    refresh: 'Refresh',
     upload: 'Upload',
     download: 'Download',
     enrich: 'Enrich Bookmarks',
     clear: 'Clear Local Bookmarks',
     settings: 'Settings',
+    confirmOverwrite: 'Remote was updated since your last sync. Overwrite remote with your local bookmarks?',
     confirmClear: 'Clear all local bookmarks?',
     processing: 'Processing...'
   },
@@ -45,12 +50,14 @@ const locales = {
     subtitle: '普通的高级书签',
     local: '本地',
     remote: '远端',
-    remoteTip: '远端数量仅在上传、下载或自动同步完成后更新。',
+    remoteTip: '远端数量仅在刷新、上传、下载或自动同步完成后更新。',
+    refresh: '刷新',
     upload: '上传',
     download: '下载',
     enrich: '智能富化',
     clear: '清空本地书签',
     settings: '设置',
+    confirmOverwrite: '检测到远端在你上次同步后已更新，是否仍要强制上传覆盖远端？',
     confirmClear: '确定清空本地所有书签？',
     processing: '处理中...'
   }
@@ -78,12 +85,24 @@ export default function App() {
     setHasWebIntegration(!!(settings.webUrl && settings.apiSecret));
   }
 
-  async function handleAction(action: string) {
+  async function runAction(action: string, payload?: Record<string, unknown>) {
+    return await browser.runtime.sendMessage({ action, ...(payload ?? {}) });
+  }
+
+  async function handleAction(action: string, payload?: Record<string, unknown>) {
     if (loading) return;
     setLoading(true);
     try {
-      const response = await browser.runtime.sendMessage({ action });
-      if (!response.success) alert(response.error);
+      let response = await runAction(action, payload);
+      let skipAlert = false;
+
+      if (!response.success && response.code === 'REMOTE_CONFLICT' && action === 'upload' && !(payload as any)?.force) {
+        const ok = confirm(t.confirmOverwrite);
+        if (ok) response = await runAction('upload', { force: true });
+        else skipAlert = true;
+      }
+
+      if (!response.success && !skipAlert) alert(response.error);
       await loadCounts();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Action failed');
@@ -102,9 +121,14 @@ export default function App() {
             <p>{t.subtitle}</p>
           </div>
         </div>
-        <button className="icon-btn" onClick={() => browser.runtime.openOptionsPage()} title={t.settings}>
-          <Icons.Settings />
-        </button>
+        <div className="header-actions">
+          <button className="icon-btn" onClick={() => handleAction('refresh')} title={t.refresh} disabled={loading}>
+            <Icons.Refresh />
+          </button>
+          <button className="icon-btn" onClick={() => browser.runtime.openOptionsPage()} title={t.settings}>
+            <Icons.Settings />
+          </button>
+        </div>
       </header>
 
       <div className="stats-container">

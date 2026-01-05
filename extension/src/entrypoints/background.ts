@@ -13,6 +13,8 @@ const locales: Record<Locale, {
   missingWebSettings: string;
   invalidWebUrl: string;
   permissionDenied: string;
+  remoteConflictTitle: string;
+  remoteConflictMessage: string;
   gistCreatedTitle: string;
   gistCreatedMessage: (gistId: string) => string;
   uploadSuccessTitle: string;
@@ -22,6 +24,7 @@ const locales: Record<Locale, {
   noBookmarksInGist: string;
   clearSuccessTitle: string;
   clearSuccessMessage: string;
+  refreshFailedTitle: string;
   enrichStartedTitle: string;
   enrichStartedMessage: string;
   enrichCompletedTitle: string;
@@ -36,6 +39,8 @@ const locales: Record<Locale, {
     missingWebSettings: 'Please configure Web URL and API Secret',
     invalidWebUrl: 'Invalid Web URL',
     permissionDenied: 'Permission denied for the configured Web URL',
+    remoteConflictTitle: 'Remote Updated',
+    remoteConflictMessage: 'Remote data changed since your last sync. Please refresh/download first, or confirm overwrite.',
     gistCreatedTitle: 'Gist Created',
     gistCreatedMessage: gistId => `Auto-created Gist: ${gistId}`,
     uploadSuccessTitle: 'Upload Success',
@@ -45,6 +50,7 @@ const locales: Record<Locale, {
     noBookmarksInGist: 'No bookmarks found in Gist',
     clearSuccessTitle: 'Clear Success',
     clearSuccessMessage: 'All bookmarks cleared',
+    refreshFailedTitle: 'Refresh Failed',
     enrichStartedTitle: 'Enrich Started',
     enrichStartedMessage: 'Enriching... refresh later to see results',
     enrichCompletedTitle: 'Enrich Completed',
@@ -59,6 +65,8 @@ const locales: Record<Locale, {
     missingWebSettings: '请配置 Web URL 和 API Secret',
     invalidWebUrl: '请输入有效的 Web URL',
     permissionDenied: '未获得所填 Web URL 的站点权限',
+    remoteConflictTitle: '远端已更新',
+    remoteConflictMessage: '检测到远端数据在你上次同步后发生变化。请先刷新/下载，或确认覆盖远端。',
     gistCreatedTitle: '已创建 Gist',
     gistCreatedMessage: gistId => `已自动创建 Gist：${gistId}`,
     uploadSuccessTitle: '上传成功',
@@ -68,6 +76,7 @@ const locales: Record<Locale, {
     noBookmarksInGist: 'Gist 中没有书签数据',
     clearSuccessTitle: '清空成功',
     clearSuccessMessage: '已清空所有书签',
+    refreshFailedTitle: '刷新失败',
     enrichStartedTitle: '开始富化',
     enrichStartedMessage: '正在富化，稍后自动刷新即可查看结果',
     enrichCompletedTitle: '富化完成',
@@ -85,6 +94,8 @@ let isSyncing = false;
 const SYNC_ALARM_NAME = 'auto-sync-bookmarks';
 
 const notificationIcon = '/icon/128.png';
+const BASE_REMOTE_UPDATED_AT_KEY = 'baseRemoteUpdatedAt';
+const REMOTE_UPDATED_AT_KEY = 'remoteUpdatedAt';
 
 const showNotification = async (title: string, message: string) => {
   if (!title?.trim() || !message?.trim()) return;
@@ -104,15 +115,26 @@ export default defineBackground(() => {
 
   browser.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     const actions: Record<string, () => Promise<void>> = {
-      upload: handleUpload,
+      upload: () => handleUpload(!!msg.force, 'manual'),
       download: handleDownload,
       clear: handleClear,
-      enrich: handleEnrich
+      enrich: handleEnrich,
+      refresh: handleRefresh
     };
 
     const action = actions[msg.action];
     if (action) {
-      action().then(() => sendResponse({ success: true })).catch(err => sendResponse({ success: false, error: err.message }));
+      action()
+        .then(() => sendResponse({ success: true }))
+        .catch((err) => {
+          const e = err as any;
+          sendResponse({
+            success: false,
+            error: e?.message ?? String(err),
+            code: e?.code,
+            details: e?.details
+          });
+        });
       return true;
     }
   });
@@ -124,12 +146,22 @@ export default defineBackground(() => {
 
   browser.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === SYNC_ALARM_NAME) {
-      handleUpload().catch(() => {});
+      handleUpload(false, 'auto').catch(() => {});
     }
   });
 });
 
-async function handleUpload() {
+class RemoteConflictError extends Error {
+  code = 'REMOTE_CONFLICT';
+  details: { remoteUpdatedAt: number; remoteCount: number };
+
+  constructor(message: string, details: { remoteUpdatedAt: number; remoteCount: number }) {
+    super(message);
+    this.details = details;
+  }
+}
+
+async function handleUpload(force = false, source: 'manual' | 'auto' = 'manual') {
   const locale = localeText();
   const settings = await getSettings();
 
@@ -138,6 +170,8 @@ async function handleUpload() {
   isSyncing = true;
   browser.action.setBadgeText({ text: '...' });
   browser.action.setBadgeBackgroundColor({ color: '#3b82f6' });
+
+  let finalBadge: { text: string; color: string } | null = null;
 
   try {
     let gistId = settings.gistId;
@@ -152,6 +186,27 @@ async function handleUpload() {
     const tree = await getBookmarkTree();
     const items = await flattenBookmarks(tree);
     const existingData = await fetchGist(settings.githubToken, gistId).catch(() => null);
+
+    if (existingData?.updatedAt) {
+      const remoteCount = countBookmarks(existingData.items ?? []);
+      await browser.storage.local.set({
+        remoteCount,
+        [REMOTE_UPDATED_AT_KEY]: existingData.updatedAt
+      });
+
+      const { [BASE_REMOTE_UPDATED_AT_KEY]: baseRemoteUpdatedAt } = await browser.storage.local.get([BASE_REMOTE_UPDATED_AT_KEY]);
+      const hasBase = typeof baseRemoteUpdatedAt === 'number';
+      const hasRemoteBookmarks = remoteCount > 0;
+      const remoteChanged = hasBase ? baseRemoteUpdatedAt !== existingData.updatedAt : hasRemoteBookmarks;
+
+      if (!force && remoteChanged) {
+        finalBadge = { text: '↻', color: '#f59e0b' };
+        throw new RemoteConflictError(locale.remoteConflictMessage, {
+          remoteUpdatedAt: existingData.updatedAt,
+          remoteCount
+        });
+      }
+    }
 
     if (existingData?.items) {
       const aiByIdMap = new Map<string, any>();
@@ -180,11 +235,20 @@ async function handleUpload() {
     await updateGist(settings.githubToken, gistId, syncData);
 
     const count = countBookmarks(syncData.items);
-    await browser.storage.local.set({ remoteCount: count });
+    await browser.storage.local.set({
+      remoteCount: count,
+      [REMOTE_UPDATED_AT_KEY]: syncData.updatedAt,
+      [BASE_REMOTE_UPDATED_AT_KEY]: syncData.updatedAt
+    });
     await showNotification(locale.uploadSuccessTitle, locale.uploadSuccessMessage(count));
   } finally {
     isSyncing = false;
-    browser.action.setBadgeText({ text: '' });
+    if (finalBadge) {
+      browser.action.setBadgeText({ text: finalBadge.text });
+      browser.action.setBadgeBackgroundColor({ color: finalBadge.color });
+    } else {
+      browser.action.setBadgeText({ text: '' });
+    }
     await updateLocalCount();
   }
 }
@@ -207,7 +271,11 @@ async function handleDownload() {
     await buildBookmarkTree(data.items);
 
     const count = countBookmarks(data.items);
-    await browser.storage.local.set({ remoteCount: count });
+    await browser.storage.local.set({
+      remoteCount: count,
+      [REMOTE_UPDATED_AT_KEY]: data.updatedAt,
+      [BASE_REMOTE_UPDATED_AT_KEY]: data.updatedAt
+    });
     await showNotification(locale.downloadSuccessTitle, locale.downloadSuccessMessage(count));
   } finally {
     isSyncing = false;
@@ -225,6 +293,22 @@ async function handleClear() {
     isSyncing = false;
     await updateLocalCount();
   }
+}
+
+async function handleRefresh() {
+  const locale = localeText();
+  const settings = await getSettings();
+
+  if (!settings.githubToken || !settings.gistId) throw new Error(locale.missingTokenAndGist);
+
+  const data = await fetchGist(settings.githubToken, settings.gistId);
+  if (!data) return;
+
+  const count = countBookmarks(data.items ?? []);
+  await browser.storage.local.set({
+    remoteCount: count,
+    [REMOTE_UPDATED_AT_KEY]: data.updatedAt
+  });
 }
 
 async function handleBookmarkChange() {

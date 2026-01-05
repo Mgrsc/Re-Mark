@@ -59,6 +59,12 @@ body {
   border-radius: 255px 15px 15px 255px / 15px 15px 5px 5px; /* Subtle sketch line */
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 .logo-area {
   display: flex;
   align-items: center;

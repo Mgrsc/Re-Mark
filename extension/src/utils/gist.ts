@@ -3,6 +3,7 @@ import type { SyncData } from '../types';
 export async function createGist(token: string): Promise<string> {
   const response = await fetch('https://api.github.com/gists', {
     method: 'POST',
+    cache: 'no-store',
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
@@ -33,6 +34,7 @@ export async function createGist(token: string): Promise<string> {
 
 export async function fetchGist(token: string, gistId: string): Promise<SyncData | null> {
   const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+    cache: 'no-store',
     headers: {
       'Authorization': `Bearer ${token}`,
       'Accept': 'application/vnd.github+json',
@@ -48,7 +50,7 @@ export async function fetchGist(token: string, gistId: string): Promise<SyncData
   if (!file) return null;
 
   if (file.truncated) {
-    const contentResponse = await fetch(file.raw_url);
+    const contentResponse = await fetch(file.raw_url, { cache: 'no-store' });
     const content = await contentResponse.text();
     return JSON.parse(content);
   }
@@ -59,6 +61,7 @@ export async function fetchGist(token: string, gistId: string): Promise<SyncData
 export async function updateGist(token: string, gistId: string, data: SyncData): Promise<void> {
   const response = await fetch(`https://api.github.com/gists/${gistId}`, {
     method: 'PATCH',
+    cache: 'no-store',
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
