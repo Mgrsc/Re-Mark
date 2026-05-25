@@ -47,6 +47,13 @@ describe('getSettings', () => {
     const { getSettings } = await import('./storage');
 
     await expect(getSettings()).resolves.toMatchObject({
+      aiApiKey: '',
+      aiApiUrl: 'https://api.deepseek.com/v1/chat/completions',
+      aiModel: 'deepseek-chat',
+      jinaApiKey: '',
+      enableSmartEnrichment: false,
+      enrichmentConcurrency: 10,
+      titleLanguage: 'auto',
       theme: 'brutalist'
     });
   });

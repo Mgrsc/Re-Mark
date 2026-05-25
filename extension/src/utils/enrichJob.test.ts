@@ -3,7 +3,10 @@ import {
   createEnrichJob,
   failEnrichJobStep,
   finishEnrichJobStep,
+  getNextEnrichStepDelayMs,
+  resolveEnrichJobStepContinuation,
   startEnrichJobStep,
+  stopEnrichJob,
   type EnrichJobState
 } from './enrichJob';
 
@@ -141,5 +144,65 @@ describe('failEnrichJobStep', () => {
     };
 
     expect(failEnrichJobStep(job, 'Network offline', 3000).nextRunAt).toBe(603000);
+  });
+});
+
+describe('getNextEnrichStepDelayMs', () => {
+  it('continues immediately when ready bookmarks remain', () => {
+    expect(getNextEnrichStepDelayMs({ processed: 10, remaining: 15, readyRemaining: 5 }, 30000)).toBe(0);
+  });
+
+  it('waits for retry backoff when only deferred bookmarks remain', () => {
+    expect(getNextEnrichStepDelayMs({ processed: 1, remaining: 1, readyRemaining: 0, retryDelayMs: 15000 }, 30000)).toBe(15000);
+  });
+
+  it('does not schedule another step when processing is complete', () => {
+    expect(getNextEnrichStepDelayMs({ processed: 10, remaining: 0, completed: true }, 30000)).toBeUndefined();
+  });
+});
+
+describe('stopEnrichJob', () => {
+  it('stops a running job without clearing progress', () => {
+    const job: EnrichJobState = {
+      state: 'running',
+      processed: 4,
+      remaining: 8,
+      attempt: 1,
+      startedAt: 1000,
+      updatedAt: 2000,
+      nextRunAt: 5000
+    };
+
+    expect(stopEnrichJob(job, 3000)).toEqual({
+      state: 'idle',
+      processed: 4,
+      remaining: 8,
+      attempt: 1,
+      startedAt: 1000,
+      updatedAt: 3000,
+      nextRunAt: undefined,
+      lastError: undefined
+    });
+  });
+});
+
+describe('resolveEnrichJobStepContinuation', () => {
+  it('continues when the active job is unchanged', () => {
+    const job = createEnrichJob(1000);
+
+    expect(resolveEnrichJobStepContinuation(job, job)).toBe('continue');
+  });
+
+  it('stops when the user stopped the active job', () => {
+    const job = createEnrichJob(1000);
+
+    expect(resolveEnrichJobStepContinuation(job, stopEnrichJob(job, 2000))).toBe('stop');
+  });
+
+  it('restarts when a newer job was created while a step was finishing', () => {
+    const job = createEnrichJob(1000);
+    const newerJob = createEnrichJob(2000);
+
+    expect(resolveEnrichJobStepContinuation(job, newerJob)).toBe('restart');
   });
 });

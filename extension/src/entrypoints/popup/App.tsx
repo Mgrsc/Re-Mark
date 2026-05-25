@@ -3,6 +3,9 @@ import { browser } from 'wxt/browser';
 import type { BookmarkItem, ThemeName } from '../../types';
 import { flattenBookmarkTreeForSearch, getBookmarkTree, searchBookmarkItems } from '../../utils/bookmarks';
 import type { EnrichJobState } from '../../utils/enrichJob';
+import { getEnrichmentMode, type EnrichmentMode } from '../../utils/enrichmentMode';
+import { getEnrichStatusText } from '../../utils/enrichStatus';
+import { ensureServicePermissionsDuringUserGesture } from '../../utils/servicePermissions';
 import { getSettings } from '../../utils/storage';
 import './style.css';
 
@@ -64,6 +67,7 @@ const locales = {
     terminalUpload: 'upload',
     terminalDownload: 'download',
     terminalEnrich: 'enrich',
+    terminalCleanTitles: 'clean titles',
     terminalClearPath: './local/bookmarks',
     minimalKicker: 'BOOKMARK ARCHIVE',
     minimalLocal: 'Local bookmarks',
@@ -74,6 +78,9 @@ const locales = {
     upload: 'Upload',
     download: 'Download',
     enrich: 'Enrich Bookmarks',
+    cleanTitles: 'Clean Titles',
+    smartEnrich: 'Smart Enrich',
+    stopProcessing: 'Stop Processing',
     clear: 'Clear Local Bookmarks',
     settings: 'Settings',
     confirmOverwrite: 'Remote was updated since your last sync. Overwrite remote with your local bookmarks?',
@@ -83,10 +90,10 @@ const locales = {
     searching: 'Searching...',
     noSearchResults: 'No matching bookmarks',
     searchFailed: 'Failed to search bookmarks',
-    enrichRunning: (processed: number, remaining: number) => `Enriching ${processed} done, ${remaining} left`,
-    enrichPaused: (remaining: number) => `Enrich paused, ${remaining} left`,
-    enrichCompleted: (processed: number) => `Enrich complete, ${processed} done`,
-    enrichFailed: 'Enrich failed'
+    enrichRunning: (processed: number, remaining: number) => `Processing ${processed} done, ${remaining} left`,
+    enrichPaused: (remaining: number) => `Processing paused, ${remaining} left`,
+    enrichCompleted: (processed: number) => `Processing complete, ${processed} done`,
+    enrichFailed: 'Action failed'
   },
   zh: {
     subtitle: '普通的高级书签',
@@ -115,6 +122,7 @@ const locales = {
     terminalUpload: '上传',
     terminalDownload: '下载',
     terminalEnrich: '富化',
+    terminalCleanTitles: '清理标题',
     terminalClearPath: './local/bookmarks',
     minimalKicker: '書　籤　管　理',
     minimalLocal: '本地书签',
@@ -125,6 +133,9 @@ const locales = {
     upload: '上传',
     download: '下载',
     enrich: '智能富化',
+    cleanTitles: '清理标题',
+    smartEnrich: '智能富化',
+    stopProcessing: '停止处理',
     clear: '清空本地书签',
     settings: '设置',
     confirmOverwrite: '检测到远端在你上次同步后已更新，是否仍要强制上传覆盖远端？',
@@ -134,10 +145,10 @@ const locales = {
     searching: '搜索中...',
     noSearchResults: '没有匹配的书签',
     searchFailed: '搜索书签失败',
-    enrichRunning: (processed: number, remaining: number) => `富化中：已处理 ${processed}，剩余 ${remaining}`,
-    enrichPaused: (remaining: number) => `富化已暂停，剩余 ${remaining}`,
-    enrichCompleted: (processed: number) => `富化完成，已处理 ${processed}`,
-    enrichFailed: '富化失败'
+    enrichRunning: (processed: number, remaining: number) => `处理中：已处理 ${processed}，剩余 ${remaining}`,
+    enrichPaused: (remaining: number) => `处理已暂停，剩余 ${remaining}`,
+    enrichCompleted: (processed: number) => `处理完成，已处理 ${processed}`,
+    enrichFailed: '处理失败'
   }
 };
 
@@ -146,7 +157,7 @@ export default function App() {
   const t = locales[locale] ?? locales.en;
   const [counts, setCounts] = useState({ local: 0, remote: 0 });
   const [loading, setLoading] = useState(false);
-  const [hasWebIntegration, setHasWebIntegration] = useState(false);
+  const [enrichmentMode, setEnrichmentMode] = useState<EnrichmentMode>('hidden');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<BookmarkItem[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -216,7 +227,7 @@ export default function App() {
 
   async function loadSettings() {
     const settings = await getSettings();
-    setHasWebIntegration(!!(settings.webUrl && settings.apiSecret));
+    setEnrichmentMode(getEnrichmentMode(settings));
     setTheme(settings.theme);
   }
 
@@ -233,6 +244,12 @@ export default function App() {
     if (loading) return;
     setLoading(true);
     try {
+      if (action === 'enrich') {
+        const settings = await getSettings();
+        const mode = getEnrichmentMode(settings);
+        await ensureServicePermissionsDuringUserGesture(settings, mode);
+      }
+
       let response = await runAction(action, payload);
       let skipAlert = false;
 
@@ -243,7 +260,7 @@ export default function App() {
       }
 
       if (!response.success && !skipAlert) alert(response.error);
-      if (action === 'enrich') await loadEnrichJob();
+      if (action === 'enrich' || action === 'stopEnrich') await loadEnrichJob();
       await loadCounts();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Action failed');
@@ -266,15 +283,13 @@ export default function App() {
     }
   }
 
-  function getEnrichStatusText() {
-    if (!enrichJob || enrichJob.state === 'idle') return '';
-    if (enrichJob.state === 'running') return t.enrichRunning(enrichJob.processed, enrichJob.remaining);
-    if (enrichJob.state === 'paused') return t.enrichPaused(enrichJob.remaining);
-    if (enrichJob.state === 'completed') return t.enrichCompleted(enrichJob.processed);
-    return enrichJob.lastError ? `${t.enrichFailed}: ${enrichJob.lastError}` : t.enrichFailed;
-  }
-
-  const enrichStatusText = getEnrichStatusText();
+  const enrichStatusText = getEnrichStatusText(enrichJob, {
+    running: t.enrichRunning,
+    paused: t.enrichPaused,
+    completed: t.enrichCompleted,
+    failed: t.enrichFailed
+  });
+  const isEnrichRunning = enrichJob?.state === 'running' || enrichJob?.state === 'paused';
   const version = browser.runtime.getManifest().version;
 
   function getSearchPlaceholder() {
@@ -446,7 +461,8 @@ export default function App() {
 
   function getActionLabel(action: 'upload' | 'download' | 'enrich') {
     if (loading) return t.processing;
-    if (action === 'enrich') return t.enrich;
+    if (action === 'enrich' && isEnrichRunning) return t.stopProcessing;
+    if (action === 'enrich') return enrichmentMode === 'smartEnrichment' ? t.smartEnrich : t.cleanTitles;
     if (theme === 'brutalist') return action === 'upload' ? t.uploadSlash : t.downloadSlash;
     if (theme === 'editorial') return action === 'upload' ? t.uploadToRemote : t.downloadFromRemote;
     if (theme === 'minimal' && locale === 'zh') return action === 'upload' ? '上　传' : '下　载';
@@ -478,17 +494,17 @@ export default function App() {
 
     return (
       <>
-        <span className="command-name">enrich</span>
-        <span className="command-flag">--ai</span>
+        <span className="command-name">{isEnrichRunning ? 'stop' : enrichmentMode === 'smartEnrichment' ? 'enrich' : 'clean-title'}</span>
+        <span className="command-flag">{isEnrichRunning ? '--now' : enrichmentMode === 'smartEnrichment' ? '--ai' : '--title'}</span>
         <span>local</span>
-        <span className="command-desc">{t.terminalEnrich}</span>
+        <span className="command-desc">{enrichmentMode === 'smartEnrichment' ? t.terminalEnrich : t.terminalCleanTitles}</span>
       </>
     );
   }
 
   function renderActionButton(action: 'upload' | 'download' | 'enrich') {
     const className = action === 'upload' ? 'action-card primary upload' : action === 'download' ? 'action-card secondary download' : 'action-card full-width enrich';
-    const actionName = action === 'upload' ? 'upload' : action === 'download' ? 'download' : 'enrich';
+    const actionName = action === 'upload' ? 'upload' : action === 'download' ? 'download' : isEnrichRunning ? 'stopEnrich' : 'enrich';
     const icon = action === 'upload' ? <Icons.Upload /> : action === 'download' ? <Icons.Download /> : <Icons.Enrich />;
 
     return (
@@ -534,10 +550,10 @@ export default function App() {
       <div className="actions-grid">
         {renderActionButton('upload')}
         {renderActionButton('download')}
-        {hasWebIntegration && renderActionButton('enrich')}
+        {enrichmentMode !== 'hidden' && renderActionButton('enrich')}
       </div>
 
-      {hasWebIntegration && enrichStatusText && (
+      {enrichmentMode !== 'hidden' && enrichStatusText && (
         <div className={`enrich-status ${enrichJob?.state ?? 'idle'}`}>
           {enrichStatusText}
         </div>

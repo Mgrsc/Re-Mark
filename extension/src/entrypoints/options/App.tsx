@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { browser } from 'wxt/browser';
 import { getSettings, saveSettings } from '../../utils/storage';
 import { THEME_OPTIONS } from '../../utils/themes';
+import { getEnrichmentMode } from '../../utils/enrichmentMode';
+import { ensureServicePermissionsDuringUserGesture } from '../../utils/servicePermissions';
 import type { Settings, ThemeName } from '../../types';
 import './style.css';
 
@@ -33,8 +34,13 @@ export default function App() {
   const [settings, setSettings] = useState<Settings>({
     githubToken: '',
     gistId: '',
-    apiSecret: '',
-    webUrl: '',
+    aiApiKey: '',
+    aiApiUrl: 'https://api.deepseek.com/v1/chat/completions',
+    aiModel: 'deepseek-chat',
+    jinaApiKey: '',
+    enableSmartEnrichment: false,
+    enrichmentConcurrency: 10,
+    titleLanguage: 'auto',
     autoSync: false,
     syncDelay: 5,
     theme: 'brutalist'
@@ -42,7 +48,9 @@ export default function App() {
   const [saved, setSaved] = useState(false);
   const [lang, setLang] = useState('en');
   const [showGithubToken, setShowGithubToken] = useState(false);
-  const [showApiSecret, setShowApiSecret] = useState(false);
+  const [showAiApiKey, setShowAiApiKey] = useState(false);
+  const [showJinaApiKey, setShowJinaApiKey] = useState(false);
+  const [useCustomTitleLanguage, setUseCustomTitleLanguage] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -61,13 +69,21 @@ export default function App() {
   async function loadSettings() {
     const data = await getSettings();
     setSettings(data);
+    setUseCustomTitleLanguage(data.titleLanguage !== 'auto');
   }
 
   async function handleSave() {
     try {
-      if (settings.webUrl) await ensureWebPermission(settings.webUrl);
+      const normalizedSettings = {
+        ...settings,
+        titleLanguage: useCustomTitleLanguage ? settings.titleLanguage.trim() || 'auto' : 'auto'
+      };
+      const mode = getEnrichmentMode(normalizedSettings);
+      if (mode !== 'hidden') await ensureServicePermissionsDuringUserGesture(settings, mode);
 
-      await saveSettings(settings);
+      await saveSettings(normalizedSettings);
+      setSettings(normalizedSettings);
+      setUseCustomTitleLanguage(normalizedSettings.titleLanguage !== 'auto');
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
@@ -89,14 +105,28 @@ export default function App() {
     gistId: 'Gist ID（可选）',
     gistIdPlaceholder: '首次上传时自动生成',
     gistIdHint: '留空自动创建，或粘贴已有 Gist ID',
-    webIntegration: 'Web 集成（可选）',
-    webIntegrationDesc: '部署 Web 界面以获得 AI 增强浏览和自动内容富化',
-    apiSecret: 'API 密钥',
-    apiSecretPlaceholder: '你的密钥',
-    apiSecretHint: '必须与 Web 部署中的密钥匹配',
-    webUrl: 'Web URL',
-    webUrlPlaceholder: 'https://remark.vercel.app',
-    webUrlHint: '你的 Vercel 部署地址',
+    aiConfig: 'AI 配置',
+    aiConfigDesc: '扩展直接调用你的 AI 服务；未配置 AI Key 时不会显示标题清理按钮。',
+    aiApiKey: 'AI API Key',
+    aiApiKeyPlaceholder: 'sk-xxxxxxxxxxxx',
+    aiApiKeyHint: '用于生成短标题；保存在本机 storage.local 中。',
+    aiApiUrl: 'AI API URL',
+    aiApiUrlPlaceholder: 'https://api.deepseek.com/v1/chat/completions',
+    aiApiUrlHint: '兼容 OpenAI Chat Completions 的接口地址。',
+    aiModel: 'AI 模型',
+    aiModelPlaceholder: 'deepseek-chat',
+    jinaApiKey: 'Jina API Key',
+    jinaApiKeyPlaceholder: 'jina_xxxxxxxxxxxx',
+    jinaApiKeyHint: '开启智能富化时必填；不再使用 Jina Free。',
+    enableSmartEnrichment: '启用智能富化',
+    smartEnrichmentDesc: '需要同时配置 AI Key 和 Jina Key，扩展会抓取正文并生成摘要、标签。',
+    enrichmentConcurrency: '并发数',
+    enrichmentConcurrencyHint: '每批同时处理的书签数量，默认 10。遇到 429 会自动退避重试。',
+    titleLanguage: '标题语言',
+    titleLanguageHint: '自定义时会把输入内容插入提示词，例如“中文”。WebDAV、API、SDK、品牌名等关键术语会保留原文。',
+    titleLanguageAuto: '自动',
+    titleLanguageCustom: '自定义',
+    titleLanguagePlaceholder: '例如：中文',
     autoSync: '自动同步',
     enableAutoSync: '启用自动同步',
     autoSyncDesc: '书签变化后自动上传（带延迟）',
@@ -115,10 +145,8 @@ export default function App() {
       'bookmarks：读取和还原你的书签结构以便同步/清空',
       'storage：在本机保存设置、计数和凭据',
       'notifications：在同步或富化完成时提醒你',
-      '可选站点权限：首次富化时会请求你配置的 Web 域名，仅用于调用 /api/enrich'
-    ],
-    permissionDenied: '未获得对填入 Web URL 的站点权限，富化可能失败。',
-    invalidWebUrl: '请输入有效的 Web URL（例如：https://example.com）。'
+      'alarms：在长任务中分批继续处理标题清理或智能富化'
+    ]
   } : {
     title: 'Re:Mark Settings',
     githubConfig: 'GitHub Configuration',
@@ -129,14 +157,28 @@ export default function App() {
     gistId: 'Gist ID (Optional)',
     gistIdPlaceholder: 'Auto-generated on first upload',
     gistIdHint: 'Leave empty to auto-create, or paste existing Gist ID',
-    webIntegration: 'Web Integration (Optional)',
-    webIntegrationDesc: 'Deploy the web interface for AI-enhanced browsing and automatic content enrichment',
-    apiSecret: 'API Secret',
-    apiSecretPlaceholder: 'Your secret key',
-    apiSecretHint: 'Must match the secret in your web deployment',
-    webUrl: 'Web URL',
-    webUrlPlaceholder: 'https://remark.vercel.app',
-    webUrlHint: 'Your deployed Vercel URL',
+    aiConfig: 'AI Configuration',
+    aiConfigDesc: 'The extension calls your AI service directly; the title cleanup action is hidden until an AI key is configured.',
+    aiApiKey: 'AI API Key',
+    aiApiKeyPlaceholder: 'sk-xxxxxxxxxxxx',
+    aiApiKeyHint: 'Used to generate concise titles and stored locally in storage.local.',
+    aiApiUrl: 'AI API URL',
+    aiApiUrlPlaceholder: 'https://api.deepseek.com/v1/chat/completions',
+    aiApiUrlHint: 'OpenAI Chat Completions compatible endpoint.',
+    aiModel: 'AI Model',
+    aiModelPlaceholder: 'deepseek-chat',
+    jinaApiKey: 'Jina API Key',
+    jinaApiKeyPlaceholder: 'jina_xxxxxxxxxxxx',
+    jinaApiKeyHint: 'Required for Smart Enrich; Jina Free is not used.',
+    enableSmartEnrichment: 'Enable Smart Enrich',
+    smartEnrichmentDesc: 'Requires both AI and Jina keys; the extension fetches page content and generates summaries and tags.',
+    enrichmentConcurrency: 'Concurrency',
+    enrichmentConcurrencyHint: 'Bookmarks processed in parallel per batch. Default is 10. 429 errors use automatic backoff.',
+    titleLanguage: 'Title Language',
+    titleLanguageHint: 'Custom input is inserted into the prompt, for example "Chinese". Key terms such as WebDAV, API, SDK, and brand names are preserved.',
+    titleLanguageAuto: 'Auto',
+    titleLanguageCustom: 'Custom',
+    titleLanguagePlaceholder: 'Example: Chinese',
     autoSync: 'Auto Sync',
     enableAutoSync: 'Enable auto sync',
     autoSyncDesc: 'Automatically upload bookmarks after changes (with delay)',
@@ -155,10 +197,8 @@ export default function App() {
       'bookmarks: read/restore your bookmark tree for sync/clear',
       'storage: save settings, counts, and credentials locally',
       'notifications: show status for sync/enrich actions',
-      'Optional site access: requested for your configured Web URL to call /api/enrich'
-    ],
-    permissionDenied: 'Site permission was denied for the configured Web URL; enrich may fail.',
-    invalidWebUrl: 'Please enter a valid Web URL (e.g., https://example.com).'
+      'alarms: continue title cleanup or smart enrichment in batches'
+    ]
   };
 
   return (
@@ -199,27 +239,107 @@ export default function App() {
         <section className="card section-web">
           <div className="card-header">
             <div className="icon-box purple"><Icons.Globe /></div>
-            <h2>{t.webIntegration}</h2>
+            <h2>{t.aiConfig}</h2>
           </div>
 
           <div className="card-body">
-            <p className="description-text">{t.webIntegrationDesc}</p>
+            <p className="description-text">{t.aiConfigDesc}</p>
 
             <div className="field">
-              <label>{t.apiSecret}</label>
+              <label>{t.aiApiKey}</label>
               <div className="input-with-toggle">
-                <input type={showApiSecret ? "text" : "password"} className="input-primary" value={settings.apiSecret} onChange={e => updateField('apiSecret', e.target.value)} placeholder={t.apiSecretPlaceholder} />
-                <button type="button" className="toggle-visibility" onClick={() => setShowApiSecret(!showApiSecret)} title={showApiSecret ? "隐藏" : "显示"}>
-                  {showApiSecret ? <Icons.EyeOff /> : <Icons.Eye />}
+                <input type={showAiApiKey ? "text" : "password"} className="input-primary" value={settings.aiApiKey} onChange={e => updateField('aiApiKey', e.target.value)} placeholder={t.aiApiKeyPlaceholder} />
+                <button type="button" className="toggle-visibility" onClick={() => setShowAiApiKey(!showAiApiKey)} title={showAiApiKey ? "隐藏" : "显示"}>
+                  {showAiApiKey ? <Icons.EyeOff /> : <Icons.Eye />}
                 </button>
               </div>
-              <small>{t.apiSecretHint}</small>
+              <small>{t.aiApiKeyHint}</small>
             </div>
 
             <div className="field">
-              <label>{t.webUrl}</label>
-              <input type="text" className="input-primary" value={settings.webUrl} onChange={e => updateField('webUrl', e.target.value)} placeholder={t.webUrlPlaceholder} />
-              <small>{t.webUrlHint}</small>
+              <label>{t.aiApiUrl}</label>
+              <input type="text" className="input-primary" value={settings.aiApiUrl} onChange={e => updateField('aiApiUrl', e.target.value)} placeholder={t.aiApiUrlPlaceholder} />
+              <small>{t.aiApiUrlHint}</small>
+            </div>
+
+            <div className="field">
+              <label>{t.aiModel}</label>
+              <input type="text" className="input-primary" value={settings.aiModel} onChange={e => updateField('aiModel', e.target.value)} placeholder={t.aiModelPlaceholder} />
+            </div>
+
+            <div className="field">
+              <label>{t.jinaApiKey}</label>
+              <div className="input-with-toggle">
+                <input type={showJinaApiKey ? "text" : "password"} className="input-primary" value={settings.jinaApiKey} onChange={e => updateField('jinaApiKey', e.target.value)} placeholder={t.jinaApiKeyPlaceholder} />
+                <button type="button" className="toggle-visibility" onClick={() => setShowJinaApiKey(!showJinaApiKey)} title={showJinaApiKey ? "隐藏" : "显示"}>
+                  {showJinaApiKey ? <Icons.EyeOff /> : <Icons.Eye />}
+                </button>
+              </div>
+              <small>{t.jinaApiKeyHint}</small>
+            </div>
+
+            <div className="checkbox-field">
+              <label className="checkbox-label">
+                <input type="checkbox" className="checkbox-input" checked={settings.enableSmartEnrichment} onChange={e => updateField('enableSmartEnrichment', e.target.checked)} />
+                <span className="checkbox-visual"></span>
+                <div className="checkbox-text">
+                  <span className="checkbox-title">{t.enableSmartEnrichment}</span>
+                  <span className="checkbox-subtitle">{t.smartEnrichmentDesc}</span>
+                </div>
+              </label>
+            </div>
+
+            <div className="field">
+              <label>{t.enrichmentConcurrency}</label>
+              <input
+                type="number"
+                className="input-primary"
+                min="1"
+                max="50"
+                value={settings.enrichmentConcurrency}
+                onChange={e => updateField('enrichmentConcurrency', normalizeConcurrencyInput(e.target.value))}
+              />
+              <small>{t.enrichmentConcurrencyHint}</small>
+            </div>
+
+            <div className="field">
+              <label>{t.titleLanguage}</label>
+              <div className="segmented-control" role="radiogroup" aria-label={t.titleLanguage}>
+                <label>
+                  <input
+                    type="radio"
+                    name="titleLanguageMode"
+                    checked={!useCustomTitleLanguage}
+                    onChange={() => {
+                      setUseCustomTitleLanguage(false);
+                      updateField('titleLanguage', 'auto');
+                    }}
+                  />
+                  <span>{t.titleLanguageAuto}</span>
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="titleLanguageMode"
+                    checked={useCustomTitleLanguage}
+                    onChange={() => {
+                      setUseCustomTitleLanguage(true);
+                      if (settings.titleLanguage === 'auto') updateField('titleLanguage', '');
+                    }}
+                  />
+                  <span>{t.titleLanguageCustom}</span>
+                </label>
+              </div>
+              {useCustomTitleLanguage && (
+                <input
+                  type="text"
+                  className="input-primary input-stacked"
+                  value={settings.titleLanguage === 'auto' ? '' : settings.titleLanguage}
+                  onChange={e => updateField('titleLanguage', e.target.value)}
+                  placeholder={t.titleLanguagePlaceholder}
+                />
+              )}
+              <small>{t.titleLanguageHint}</small>
             </div>
           </div>
         </section>
@@ -315,30 +435,8 @@ export default function App() {
   );
 }
 
-async function ensureWebPermission(webUrl: string) {
-  if (!webUrl) return;
-
-  let origin: string;
-  try {
-    const url = new URL(webUrl);
-    origin = `${url.origin}/*`;
-  } catch {
-    throw new Error(localizedInvalidUrlMessage(webUrl));
-  }
-
-  const hasPermission = await browser.permissions.contains({ origins: [origin] });
-  if (hasPermission) return;
-
-  const granted = await browser.permissions.request({ origins: [origin] });
-  if (!granted) throw new Error(localizedPermissionDeniedMessage());
-}
-
-function localizedInvalidUrlMessage(_webUrl: string): string {
-  const lang = navigator.language?.toLowerCase().startsWith('zh') ? 'zh' : 'en';
-  return lang === 'zh' ? '请输入有效的 Web URL（例如：https://example.com）。' : 'Please enter a valid Web URL (e.g., https://example.com).';
-}
-
-function localizedPermissionDeniedMessage(): string {
-  const lang = navigator.language?.toLowerCase().startsWith('zh') ? 'zh' : 'en';
-  return lang === 'zh' ? '未获得对填入 Web URL 的站点权限，富化可能失败。' : 'Site permission was denied for the configured Web URL; enrich may fail.';
+function normalizeConcurrencyInput(value: string): number {
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed)) return 10;
+  return Math.min(Math.max(parsed, 1), 50);
 }

@@ -16,7 +16,7 @@ export async function createGist(token: string): Promise<string> {
       files: {
         'bookmarks.json': {
           content: JSON.stringify({
-            version: '2.0',
+            version: '2.5',
             updatedAt: Date.now(),
             browser: navigator.userAgent,
             items: []

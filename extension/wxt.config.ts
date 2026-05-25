@@ -14,7 +14,10 @@ export default defineConfig({
       "https://raw.githubusercontent.com/*",
       ...(command === 'serve' ? ["http://localhost:*/*"] : [])
     ],
-    optional_host_permissions: ["https://*/*", "http://*/*"],
+    optional_host_permissions: [
+      "https://*/*",
+      ...(command === 'serve' ? ["http://localhost:*/*"] : [])
+    ],
     icons: {
       "16": "icon/16.png",
       "32": "icon/32.png",

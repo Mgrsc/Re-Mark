@@ -15,8 +15,13 @@ export interface EnrichJobState {
 export interface EnrichStepResult {
   processed?: number;
   remaining?: number;
+  readyRemaining?: number;
   completed?: boolean;
+  retryDelayMs?: number;
+  timedOut?: boolean;
 }
+
+export type EnrichJobStepContinuation = 'continue' | 'restart' | 'stop';
 
 const BASE_RETRY_DELAY_MS = 15_000;
 const MAX_RETRY_DELAY_MS = 600_000;
@@ -79,4 +84,38 @@ export function failEnrichJobStep(job: EnrichJobState, error: string, now: numbe
     nextRunAt: now + retryDelay,
     lastError: error
   };
+}
+
+export function getNextEnrichStepDelayMs(result: EnrichStepResult, fallbackDelayMs: number): number | undefined {
+  const remaining = result.remaining ?? 0;
+  if (result.completed || remaining === 0) return undefined;
+  if ((result.readyRemaining ?? 0) > 0) return 0;
+  if (result.retryDelayMs !== undefined) return result.retryDelayMs;
+  if (result.timedOut || (result.processed ?? 0) > 0) return 0;
+  return fallbackDelayMs;
+}
+
+export function stopEnrichJob(job: EnrichJobState, now: number): EnrichJobState {
+  return {
+    ...job,
+    state: 'idle',
+    updatedAt: now,
+    nextRunAt: undefined,
+    lastError: undefined
+  };
+}
+
+export function resolveEnrichJobStepContinuation(
+  startedJob: EnrichJobState,
+  currentJob: EnrichJobState | null
+): EnrichJobStepContinuation {
+  if (!currentJob || currentJob.state === 'idle' || currentJob.state === 'completed' || currentJob.state === 'failed') {
+    return 'stop';
+  }
+
+  if (currentJob.startedAt !== startedJob.startedAt) {
+    return 'restart';
+  }
+
+  return 'continue';
 }
