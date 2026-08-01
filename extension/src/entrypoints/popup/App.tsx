@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { browser } from 'wxt/browser';
+import type { Browser } from 'wxt/browser';
 import type { BookmarkItem, ThemeName } from '../../types';
 import { flattenBookmarkTreeForSearch, getBookmarkTree, searchBookmarkItems } from '../../utils/bookmarks';
 import type { EnrichJobState } from '../../utils/enrichJob';
@@ -176,7 +177,7 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
-    const listener = (changes: Record<string, chrome.storage.StorageChange>, areaName: string) => {
+    const listener = (changes: Record<string, Browser.storage.StorageChange>, areaName: string) => {
       if (areaName !== 'local') return;
       if (changes.enrichJob) setEnrichJob((changes.enrichJob.newValue as EnrichJobState | undefined) ?? null);
       if (changes.theme?.newValue) setTheme(changes.theme.newValue as ThemeName);
@@ -221,7 +222,7 @@ export default function App() {
   }, [searchQuery, t.searchFailed]);
 
   async function loadCounts() {
-    const data = await browser.storage.local.get(['localCount', 'remoteCount']);
+    const data = await browser.storage.local.get<{ localCount?: number; remoteCount?: number }>(['localCount', 'remoteCount']);
     setCounts({ local: data.localCount || 0, remote: data.remoteCount || 0 });
   }
 

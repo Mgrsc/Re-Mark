@@ -19,12 +19,12 @@ const DEFAULT_SETTINGS: Settings = {
 const SETTING_KEYS = Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[];
 
 export async function getSettings(): Promise<Settings> {
-  const localSettings = await browser.storage.local.get(SETTING_KEYS);
+  const localSettings = await browser.storage.local.get<Partial<Settings>>(SETTING_KEYS);
   const mergedLocal = { ...DEFAULT_SETTINGS, ...localSettings } as Settings;
 
   const needsMigration = !localSettings.githubToken && !localSettings.gistId && !localSettings.aiApiKey;
   if (needsMigration) {
-    const syncSettings = await browser.storage.sync.get(DEFAULT_SETTINGS);
+    const syncSettings = await browser.storage.sync.get<Settings>(DEFAULT_SETTINGS);
     const migrated = { ...DEFAULT_SETTINGS, ...syncSettings, ...localSettings } as Settings;
     await browser.storage.local.set(migrated);
     return migrated;
