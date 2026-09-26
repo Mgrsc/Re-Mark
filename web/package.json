@@ -9,13 +9,13 @@
     "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/vercel": "11.0.4",
+    "@astrojs/vercel": "11.0.11",
     "@vercel/analytics": "2.0.1",
     "@vercel/speed-insights": "2.0.0",
-    "astro": "7.1.6"
+    "astro": "7.3.5"
   },
   "overrides": {
-    "sharp": ">=0.35.3 <0.36",
+    "sharp": ">=0.35.4 <0.36",
     "tar": ">=7.5.22 <8"
   },
   "engines": {
