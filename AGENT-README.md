@@ -49,7 +49,7 @@ bun run build
 ## Dependency Baseline
 
 - Web: Astro 7 with the Vercel 11 adapter, Vercel Analytics 2, and Speed Insights 2.
-- Extension: WXT 0.21, React 19.2, and TypeScript 7.
+- Extension: WXT 0.21, React 19.3, and TypeScript 7.
 - `extension/tsconfig.json` extends WXT's generated `.wxt/tsconfig.json`; run a WXT build or prepare step before standalone type checking in a fresh checkout.
 - Keep `web/bun.lock` and `extension/bun.lock` separate and update dependencies from the owning application directory.
 
